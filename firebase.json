@@ -1,0 +1,27 @@
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "familyassistant2026",
+          "appId": "1:518539965855:android:71213931cd48a97b8cf9aa",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "familyassistant2026",
+          "configurations": {
+            "android": "1:518539965855:android:71213931cd48a97b8cf9aa",
+            "ios": "1:518539965855:ios:f39d3ca8e93122668cf9aa",
+            "web": "1:518539965855:web:35060e67062d7bfe8cf9aa"
+          }
+        }
+      }
+    }
+  }
+}

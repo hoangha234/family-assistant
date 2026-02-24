@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "518539965855",
+    "project_id": "familyassistant2026",
+    "storage_bucket": "familyassistant2026.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:518539965855:android:71213931cd48a97b8cf9aa",
+        "android_client_info": {
+          "package_name": "com.example.family_assistant"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD6yfFNk6h3wwSPb6SbtEcpcKIpOIJRuj0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
