@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import '../models/ai_response_model.dart';
 
@@ -25,10 +26,10 @@ class AIService {
 
   bool _useFallback = false;
   static const List<String> _availableModels = [
-    'gemini-2.0-flash',
-    'gemini-2.0-flash-lite',
     'gemini-1.5-flash',
     'gemini-1.5-pro',
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-lite',
   ];
 
   // Try different API versions
@@ -40,8 +41,8 @@ class AIService {
   AIService({
     String? apiKey,
     String? model,
-  })  : _apiKey = apiKey ?? 'AIzaSyAtEUiABLBl4D8ygkNA214GcUVNlsDGt-E',
-        _model = model ?? 'gemini-2.0-flash',
+  })  : _apiKey = apiKey ?? 'AIzaSyAoN8VqWrtYjm6L-nWWwvKdKnnRkKvpgrU',
+        _model = model ?? 'gemini-1.5-flash',
         _httpClient = HttpClient();
 
   String get _currentApiVersion => _apiVersions[_currentApiVersionIndex];
@@ -244,6 +245,316 @@ You are allowed to be conversational and informal when appropriate.
       caseSensitive: false,
     );
     return vietnamesePattern.hasMatch(text);
+  }
+
+  // ============================================================
+  // IMAGE GENERATION
+  // ============================================================
+
+  /// Generate an image from a text prompt using Gemini's image generation
+  ///
+  /// Tries multiple model configurations until one works
+  /// Returns: Uint8List containing the image bytes, or null if all fail
+  Future<Uint8List?> generateImage(String prompt) async {
+    if (prompt.trim().isEmpty) {
+      throw AIServiceException('Image prompt cannot be empty');
+    }
+
+    debugPrint('🎨 [AI] ========== IMAGE GENERATION START ==========');
+    debugPrint('🎨 [AI] Prompt: ${prompt.substring(0, prompt.length > 80 ? 80 : prompt.length)}...');
+
+    // Configuration attempts - try different models and settings
+    final attempts = [
+      // Attempt 1: gemini-2.0-flash-exp with IMAGE modality
+      () => _tryGeminiImageGeneration(
+        prompt: prompt,
+        model: 'gemini-2.0-flash-exp',
+        modalities: ['IMAGE'],
+      ),
+      // Attempt 2: gemini-2.0-flash-exp with IMAGE + TEXT
+      () => _tryGeminiImageGeneration(
+        prompt: prompt,
+        model: 'gemini-2.0-flash-exp',
+        modalities: ['IMAGE', 'TEXT'],
+      ),
+      // Attempt 3: Try imagen-3.0-generate-001
+      () => _tryImagenGeneration(prompt: prompt, model: 'imagen-3.0-generate-001'),
+      // Attempt 4: Try with different model name
+      () => _tryGeminiImageGeneration(
+        prompt: prompt,
+        model: 'gemini-exp-1206',
+        modalities: ['IMAGE'],
+      ),
+    ];
+
+    for (int i = 0; i < attempts.length; i++) {
+      debugPrint('🎨 [AI] --- Attempt ${i + 1}/${attempts.length} ---');
+      try {
+        final result = await attempts[i]();
+        if (result != null && result.isNotEmpty) {
+          debugPrint('✅ [AI] Image generated! Size: ${result.length} bytes');
+          debugPrint('🎨 [AI] ========== IMAGE GENERATION SUCCESS ==========');
+          return result;
+        }
+      } catch (e) {
+        debugPrint('⚠️ [AI] Attempt ${i + 1} exception: $e');
+      }
+    }
+
+    debugPrint('❌ [AI] All attempts failed');
+    debugPrint('🎨 [AI] ========== IMAGE GENERATION FAILED ==========');
+    return null;
+  }
+
+  /// Try Gemini model for image generation
+  Future<Uint8List?> _tryGeminiImageGeneration({
+    required String prompt,
+    required String model,
+    required List<String> modalities,
+  }) async {
+    debugPrint('🎨 [AI] Model: $model, Modalities: $modalities');
+
+    try {
+      final uri = Uri.parse(
+        'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$_apiKey',
+      );
+
+      final request = await _httpClient.postUrl(uri);
+      request.headers.set('Content-Type', 'application/json');
+
+      final body = jsonEncode({
+        'contents': [
+          {
+            'parts': [
+              {
+                'text': 'Create a professional, appetizing food photograph of: $prompt. '
+                    'Style: high-quality food photography, well-lit, beautiful plating, shallow depth of field.'
+              }
+            ]
+          }
+        ],
+        'generationConfig': {
+          'responseModalities': modalities,
+        },
+      });
+
+      request.write(body);
+
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
+
+      debugPrint('🎨 [AI] HTTP Status: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(responseBody) as Map<String, dynamic>;
+
+        // Debug: log structure
+        _debugLogResponse(data);
+
+        return _extractImageFromResponse(data);
+      } else {
+        _debugLogError(responseBody);
+      }
+
+      return null;
+    } catch (e) {
+      debugPrint('❌ [AI] Gemini error: $e');
+      return null;
+    }
+  }
+
+  /// Try Imagen model for image generation
+  Future<Uint8List?> _tryImagenGeneration({
+    required String prompt,
+    required String model,
+  }) async {
+    debugPrint('🎨 [AI] Imagen Model: $model');
+
+    try {
+      final uri = Uri.parse(
+        'https://generativelanguage.googleapis.com/v1beta/models/$model:predict?key=$_apiKey',
+      );
+
+      final request = await _httpClient.postUrl(uri);
+      request.headers.set('Content-Type', 'application/json');
+
+      final body = jsonEncode({
+        'instances': [
+          {'prompt': 'Professional food photography: $prompt'}
+        ],
+        'parameters': {
+          'sampleCount': 1,
+          'aspectRatio': '4:3',
+        },
+      });
+
+      request.write(body);
+
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
+
+      debugPrint('🎨 [AI] HTTP Status: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(responseBody) as Map<String, dynamic>;
+        return _extractImageFromImagenResponse(data);
+      } else {
+        _debugLogError(responseBody);
+      }
+
+      return null;
+    } catch (e) {
+      debugPrint('❌ [AI] Imagen error: $e');
+      return null;
+    }
+  }
+
+  /// Debug log response structure
+  void _debugLogResponse(Map<String, dynamic> data) {
+    try {
+      debugPrint('🔍 [AI] Response keys: ${data.keys.toList()}');
+
+      final candidates = data['candidates'] as List<dynamic>?;
+      if (candidates == null || candidates.isEmpty) {
+        debugPrint('🔍 [AI] No candidates found');
+        return;
+      }
+
+      debugPrint('🔍 [AI] Candidates count: ${candidates.length}');
+
+      final firstCandidate = candidates.first as Map<String, dynamic>;
+      final content = firstCandidate['content'] as Map<String, dynamic>?;
+
+      if (content == null) {
+        debugPrint('🔍 [AI] No content in first candidate');
+        return;
+      }
+
+      final parts = content['parts'] as List<dynamic>?;
+      if (parts == null || parts.isEmpty) {
+        debugPrint('🔍 [AI] No parts in content');
+        return;
+      }
+
+      debugPrint('🔍 [AI] Parts count: ${parts.length}');
+
+      for (int i = 0; i < parts.length; i++) {
+        final part = parts[i] as Map<String, dynamic>;
+        debugPrint('🔍 [AI] Part $i keys: ${part.keys.toList()}');
+
+        if (part.containsKey('text')) {
+          final text = part['text'] as String;
+          debugPrint('🔍 [AI] Part $i has text (${text.length} chars)');
+        }
+        if (part.containsKey('inline_data')) {
+          final inlineData = part['inline_data'] as Map<String, dynamic>;
+          debugPrint('🔍 [AI] Part $i has inline_data: ${inlineData.keys.toList()}');
+          if (inlineData.containsKey('mime_type')) {
+            debugPrint('🔍 [AI] MIME type: ${inlineData['mime_type']}');
+          }
+          if (inlineData.containsKey('data')) {
+            final dataStr = inlineData['data'] as String;
+            debugPrint('🔍 [AI] Data length: ${dataStr.length} chars');
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('🔍 [AI] Debug log error: $e');
+    }
+  }
+
+  /// Debug log error response
+  void _debugLogError(String responseBody) {
+    try {
+      final data = jsonDecode(responseBody) as Map<String, dynamic>;
+      final error = data['error'] as Map<String, dynamic>?;
+      if (error != null) {
+        debugPrint('❌ [AI] Error code: ${error['code']}');
+        debugPrint('❌ [AI] Error message: ${error['message']}');
+        debugPrint('❌ [AI] Error status: ${error['status']}');
+      } else {
+        debugPrint('❌ [AI] Unknown error format');
+      }
+    } catch (_) {
+      debugPrint('❌ [AI] Raw error: ${responseBody.substring(0, responseBody.length > 200 ? 200 : responseBody.length)}');
+    }
+  }
+
+  /// Extract base64 image data from Gemini response
+  Uint8List? _extractImageFromResponse(Map<String, dynamic> data) {
+    try {
+      final candidates = data['candidates'] as List<dynamic>?;
+      if (candidates == null || candidates.isEmpty) {
+        debugPrint('❌ [AI] No candidates in image response');
+        return null;
+      }
+
+      final content = candidates.first['content'] as Map<String, dynamic>?;
+      if (content == null) {
+        debugPrint('❌ [AI] No content in image response');
+        return null;
+      }
+
+      final parts = content['parts'] as List<dynamic>?;
+      if (parts == null || parts.isEmpty) {
+        debugPrint('❌ [AI] No parts in image response');
+        return null;
+      }
+
+      // Look for inline_data with image
+      for (final part in parts) {
+        if (part is Map<String, dynamic>) {
+          final inlineData = part['inline_data'] as Map<String, dynamic>?;
+          if (inlineData != null) {
+            final mimeType = inlineData['mime_type'] as String?;
+            final base64Data = inlineData['data'] as String?;
+
+            if (base64Data != null && mimeType?.startsWith('image/') == true) {
+              debugPrint('✅ [AI] Found image data, mime: $mimeType');
+              return base64Decode(base64Data);
+            }
+          }
+
+          // Also check for fileData
+          final fileData = part['file_data'] as Map<String, dynamic>?;
+          if (fileData != null) {
+            debugPrint('✅ [AI] Found file_data in response');
+            // File data contains a URI, would need additional fetch
+          }
+        }
+      }
+
+      debugPrint('❌ [AI] No image data found in response parts');
+      return null;
+    } catch (e) {
+      debugPrint('❌ [AI] Error extracting image: $e');
+      return null;
+    }
+  }
+
+  /// Extract base64 image from Imagen response format
+  Uint8List? _extractImageFromImagenResponse(Map<String, dynamic> data) {
+    try {
+      final predictions = data['predictions'] as List<dynamic>?;
+      if (predictions == null || predictions.isEmpty) {
+        debugPrint('❌ [AI] No predictions in Imagen response');
+        return null;
+      }
+
+      final prediction = predictions.first as Map<String, dynamic>;
+      final bytesBase64 = prediction['bytesBase64Encoded'] as String?;
+
+      if (bytesBase64 != null) {
+        debugPrint('✅ [AI] Found Imagen image data');
+        return base64Decode(bytesBase64);
+      }
+
+      debugPrint('❌ [AI] No bytesBase64Encoded in Imagen response');
+      return null;
+    } catch (e) {
+      debugPrint('❌ [AI] Error extracting Imagen image: $e');
+      return null;
+    }
   }
 
   void resetFallback() {

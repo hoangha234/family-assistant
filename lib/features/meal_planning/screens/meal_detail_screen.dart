@@ -1,23 +1,41 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:math' as math;
 import '../cubit/meal_detail_cubit.dart';
+import '../models/meal_model.dart';
 
 class MealDetailScreen extends StatelessWidget {
-  const MealDetailScreen({super.key});
+  final MealModel? meal;
+
+  const MealDetailScreen({super.key, this.meal});
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => MealDetailCubit(),
-      child: const MealDetailView(),
+      create: (context) {
+        final cubit = MealDetailCubit();
+        // Initialize ingredients from meal data
+        final ingredients = meal?.ingredients ?? [
+          "Fresh Salmon Fillets - 2 large fillets (approx 400g)",
+          "Organic Lemons - 2 sliced into rounds",
+          "Extra Virgin Olive Oil - 2 tablespoons",
+          "Asparagus Spears - 1 bunch, trimmed",
+          "Garlic Powder & Sea Salt - To taste",
+        ];
+        cubit.initIngredients(ingredients);
+        return cubit;
+      },
+      child: MealDetailView(meal: meal),
     );
   }
 }
 
 class MealDetailView extends StatelessWidget {
-  const MealDetailView({super.key});
+  final MealModel? meal;
+
+  const MealDetailView({super.key, this.meal});
 
   final Color primaryColor = const Color(0xFF13EC80);
   final Color bgLight = const Color(0xFFF6F8F7);
@@ -33,6 +51,23 @@ class MealDetailView extends StatelessWidget {
     final textColor = isDarkMode ? Colors.white : textDark;
     final mutedColor = isDarkMode ? const Color(0xFFA0C5B3) : textGreenMuted;
 
+    // Use passed meal data or fallback to defaults
+    final mealName = meal?.name ?? "Grilled Lemon Salmon";
+    final mealDescription = meal?.description ?? "Rich in Omega-3 fatty acids, this light and zesty meal is perfect for maintaining a balanced diet for the whole family.";
+    final mealImage = meal?.imageUrl ?? 'https://images.unsplash.com/photo-1467003909585-2f8a7270028d?q=80&w=800&auto=format&fit=crop';
+    final mealCalories = meal?.calories ?? 450;
+    final mealProtein = meal?.protein ?? 35;
+    final mealCarbs = meal?.carbs ?? 12;
+    final mealFats = meal?.fats ?? 22;
+    final mealInstructions = meal?.instructions ?? [
+      "Preheat oven to 200°C (400°F).",
+      "Season salmon with salt, pepper, and garlic powder.",
+      "Place salmon on baking sheet with lemon slices.",
+      "Drizzle with olive oil.",
+      "Bake for 20-25 minutes until cooked through.",
+    ];
+    final mealType = meal?.type.displayName.toUpperCase() ?? "LUNCH";
+
     return BlocBuilder<MealDetailCubit, MealDetailState>(
       builder: (context, state) {
         return Scaffold(
@@ -44,9 +79,10 @@ class MealDetailView extends StatelessWidget {
                 left: 0,
                 right: 0,
                 height: 360,
-                child: Image.network(
-                  'https://images.unsplash.com/photo-1467003909585-2f8a7270028d?q=80&w=800&auto=format&fit=crop',
-                  fit: BoxFit.cover,
+                child: _buildHeroImage(
+                  imageUrl: mealImage,
+                  imageBytes: meal?.imageBytes,
+                  primaryColor: primaryColor,
                 ),
               ),
               Positioned.fill(
@@ -62,7 +98,7 @@ class MealDetailView extends StatelessWidget {
                           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
+                              color: Colors.black.withAlpha(13),
                               blurRadius: 20,
                               offset: const Offset(0, -5),
                             ),
@@ -78,11 +114,11 @@ class MealDetailView extends StatelessWidget {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                                   decoration: BoxDecoration(
-                                    color: primaryColor.withOpacity(0.2),
+                                    color: primaryColor.withAlpha(51),
                                     borderRadius: BorderRadius.circular(20),
                                   ),
                                   child: Text(
-                                    "HEART HEALTHY",
+                                    mealType,
                                     style: GoogleFonts.manrope(
                                       fontSize: 10,
                                       fontWeight: FontWeight.bold,
@@ -109,7 +145,7 @@ class MealDetailView extends StatelessWidget {
                             ),
                             const SizedBox(height: 12),
                             Text(
-                              "Grilled Lemon Salmon",
+                              mealName,
                               style: GoogleFonts.manrope(
                                 fontSize: 28,
                                 fontWeight: FontWeight.w800,
@@ -119,7 +155,7 @@ class MealDetailView extends StatelessWidget {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              "Rich in Omega-3 fatty acids, this light and zesty meal is perfect for maintaining a balanced diet for the whole family.",
+                              mealDescription,
                               style: GoogleFonts.manrope(
                                 fontSize: 14,
                                 color: mutedColor,
@@ -130,10 +166,10 @@ class MealDetailView extends StatelessWidget {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                _buildNutritionCircle("450", "CALORIES", 0.75, primaryColor, mutedColor, textColor),
-                                _buildNutritionCircle("35g", "PROTEIN", 0.60, primaryColor, mutedColor, textColor, rotation: 12),
-                                _buildNutritionCircle("12g", "CARBS", 0.25, primaryColor, mutedColor, textColor, rotation: -90),
-                                _buildNutritionCircle("22g", "FATS", 0.40, primaryColor, mutedColor, textColor, rotation: 45),
+                                _buildNutritionCircle("$mealCalories", "CALORIES", (mealCalories / 600).clamp(0.0, 1.0), primaryColor, mutedColor, textColor),
+                                _buildNutritionCircle("${mealProtein}g", "PROTEIN", (mealProtein / 50).clamp(0.0, 1.0), primaryColor, mutedColor, textColor, rotation: 12),
+                                _buildNutritionCircle("${mealCarbs}g", "CARBS", (mealCarbs / 80).clamp(0.0, 1.0), primaryColor, mutedColor, textColor, rotation: -90),
+                                _buildNutritionCircle("${mealFats}g", "FATS", (mealFats / 40).clamp(0.0, 1.0), primaryColor, mutedColor, textColor, rotation: 45),
                               ],
                             ),
                             const SizedBox(height: 32),
@@ -145,16 +181,35 @@ class MealDetailView extends StatelessWidget {
                             ),
                             const SizedBox(height: 24),
                             if (state.isIngredientsTab) ...[
-                              _buildIngredientItem("Fresh Salmon Fillets", "2 large fillets (approx 400g)", true, primaryColor, textColor, mutedColor, isDarkMode),
-                              _buildIngredientItem("Organic Lemons", "2 sliced into rounds", false, primaryColor, textColor, mutedColor, isDarkMode),
-                              _buildIngredientItem("Extra Virgin Olive Oil", "2 tablespoons", false, primaryColor, textColor, mutedColor, isDarkMode),
-                              _buildIngredientItem("Asparagus Spears", "1 bunch, trimmed", false, primaryColor, textColor, mutedColor, isDarkMode),
-                              _buildIngredientItem("Garlic Powder & Sea Salt", "To taste", false, primaryColor, textColor, mutedColor, isDarkMode),
+                              // Render ingredients from state
+                              ...state.ingredients.asMap().entries.map((entry) {
+                                final index = entry.key;
+                                final item = entry.value;
+                                return _buildIngredientItem(
+                                  context,
+                                  index,
+                                  item.name,
+                                  item.quantity,
+                                  item.isChecked,
+                                  primaryColor,
+                                  textColor,
+                                  mutedColor,
+                                  isDarkMode,
+                                );
+                              }),
                             ] else ...[
-                              Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 20),
-                                child: Text("Instructions content goes here...", style: TextStyle(color: textColor)),
-                              ),
+                              ...mealInstructions.asMap().entries.map((entry) {
+                                final index = entry.key;
+                                final instruction = entry.value;
+                                return _buildInstructionItem(
+                                  index + 1,
+                                  instruction,
+                                  primaryColor,
+                                  textColor,
+                                  mutedColor,
+                                  isDarkMode,
+                                );
+                              }),
                             ],
                             const SizedBox(height: 40),
                           ],
@@ -199,8 +254,8 @@ class MealDetailView extends StatelessWidget {
                       end: Alignment.topCenter,
                       colors: [
                         backgroundColor,
-                        backgroundColor.withOpacity(0.95),
-                        backgroundColor.withOpacity(0.0),
+                        backgroundColor.withAlpha(242),
+                        backgroundColor.withAlpha(0),
                       ],
                       stops: const [0.0, 0.6, 1.0],
                     ),
@@ -211,7 +266,7 @@ class MealDetailView extends StatelessWidget {
                       backgroundColor: primaryColor,
                       foregroundColor: const Color(0xFF102219),
                       elevation: 8,
-                      shadowColor: primaryColor.withOpacity(0.3),
+                      shadowColor: primaryColor.withAlpha(77),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
@@ -241,6 +296,43 @@ class MealDetailView extends StatelessWidget {
     );
   }
 
+  /// Build hero image - uses AI-generated bytes if available
+  Widget _buildHeroImage({
+    required String imageUrl,
+    Uint8List? imageBytes,
+    required Color primaryColor,
+  }) {
+    // If we have AI-generated image bytes, use them
+    if (imageBytes != null && imageBytes.isNotEmpty) {
+      return Image.memory(
+        imageBytes,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            color: primaryColor.withAlpha(51),
+            child: Center(
+              child: Icon(Icons.restaurant, size: 80, color: primaryColor),
+            ),
+          );
+        },
+      );
+    }
+
+    // Otherwise fall back to network image
+    return Image.network(
+      imageUrl,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        return Container(
+          color: primaryColor.withAlpha(51),
+          child: Center(
+            child: Icon(Icons.restaurant, size: 80, color: primaryColor),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildGlassButton(IconData icon, BuildContext context) {
     return GestureDetector(
       onTap: icon == Icons.arrow_back ? () => Navigator.pop(context) : null,
@@ -248,11 +340,11 @@ class MealDetailView extends StatelessWidget {
         width: 44,
         height: 44,
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.8),
+          color: Colors.white.withAlpha(204),
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withAlpha(26),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -277,7 +369,7 @@ class MealDetailView extends StatelessWidget {
               CircularProgressIndicator(
                 value: 1.0,
                 strokeWidth: 4,
-                color: primary.withOpacity(0.2),
+                color: primary.withAlpha(51),
               ),
               Transform.rotate(
                 angle: rotation * (math.pi / 180),
@@ -341,36 +433,48 @@ class MealDetailView extends StatelessWidget {
     );
   }
 
-  Widget _buildIngredientItem(String name, String qty, bool isChecked, Color primary, Color textColor, Color muted, bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 24,
-            height: 24,
-            decoration: BoxDecoration(
-              color: isChecked ? primary : Colors.transparent,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(
-                color: isChecked ? primary : (isDark ? Colors.grey[700]! : Colors.grey[300]!),
-                width: 2,
-              ),
-            ),
-            child: isChecked
-                ? const Icon(Icons.check, size: 16, color: Colors.white)
-                : null,
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.only(bottom: 16),
+  Widget _buildIngredientItem(
+    BuildContext context,
+    int index,
+    String name,
+    String qty,
+    bool isChecked,
+    Color primary,
+    Color textColor,
+    Color muted,
+    bool isDark,
+  ) {
+    return GestureDetector(
+      onTap: () => context.read<MealDetailCubit>().toggleIngredient(index),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 24,
+              height: 24,
               decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(
-                    color: isDark ? const Color(0xFF2D4239) : const Color(0xFFF0F3F2),
-                  ),
+                color: isChecked ? primary : Colors.transparent,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: isChecked ? primary : (isDark ? Colors.grey[700]! : Colors.grey[300]!),
+                  width: 2,
+                ),
+              ),
+              child: isChecked
+                  ? const Icon(Icons.check, size: 16, color: Colors.white)
+                  : null,
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(
+                      color: isDark ? const Color(0xFF2D4239) : const Color(0xFFF0F3F2),
+                    ),
                 ),
               ),
               child: Column(
@@ -384,15 +488,69 @@ class MealDetailView extends StatelessWidget {
                       color: textColor,
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    qty,
-                    style: GoogleFonts.manrope(
-                      fontSize: 12,
-                      color: muted,
+                  if (qty.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      qty,
+                      style: GoogleFonts.manrope(
+                        fontSize: 12,
+                        color: muted,
+                      ),
                     ),
-                  ),
+                  ],
                 ],
+              ),
+            ),
+          ),
+        ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInstructionItem(int step, String instruction, Color primary, Color textColor, Color muted, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: primary.withAlpha(51),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Center(
+              child: Text(
+                '$step',
+                style: GoogleFonts.manrope(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: primary,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(
+                    color: isDark ? const Color(0xFF2D4239) : const Color(0xFFF0F3F2),
+                  ),
+                ),
+              ),
+              child: Text(
+                instruction,
+                style: GoogleFonts.manrope(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: textColor,
+                  height: 1.5,
+                ),
               ),
             ),
           ),

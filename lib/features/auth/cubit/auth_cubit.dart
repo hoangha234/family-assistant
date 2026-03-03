@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
 
@@ -14,12 +15,16 @@ class AuthCubit extends Cubit<AuthState> {
 
   AuthCubit({AuthService? authService})
       : _authService = authService ?? AuthService(),
-        super(const AuthState.initial());
+        super(const AuthState.initial()) {
+    debugPrint('[AuthCubit] Created');
+  }
 
   /// Initialize and listen to auth state changes
   void initialize() {
+    debugPrint('[AuthCubit] Initializing...');
     _authSubscription?.cancel();
     _authSubscription = _authService.authStateChanges.listen((user) {
+      debugPrint('[AuthCubit] Auth state changed: ${user?.email ?? "null"}');
       if (user != null) {
         emit(AuthState.authenticated(UserModel.fromFirebaseUser(user)));
       } else {
@@ -30,6 +35,8 @@ class AuthCubit extends Cubit<AuthState> {
 
   /// Login with email and password
   Future<void> login(String email, String password) async {
+    debugPrint('[AuthCubit] Login attempt for: $email');
+
     if (email.isEmpty || password.isEmpty) {
       emit(AuthState.error('Please enter email and password'));
       return;
@@ -42,30 +49,39 @@ class AuthCubit extends Cubit<AuthState> {
         email: email,
         password: password,
       );
+      debugPrint('[AuthCubit] Login successful: ${user.email}');
       emit(AuthState.authenticated(user));
     } on AuthServiceException catch (e) {
+      debugPrint('[AuthCubit] AuthServiceException: ${e.message}');
       emit(AuthState.error(e.message));
     } catch (e) {
+      debugPrint('[AuthCubit] Unknown error: $e');
       emit(AuthState.error('Login failed. Please try again.'));
     }
   }
 
   /// Login with Google
   Future<void> loginWithGoogle() async {
+    debugPrint('[AuthCubit] Google login attempt');
     emit(const AuthState.loading());
 
     try {
       final user = await _authService.loginWithGoogle();
+      debugPrint('[AuthCubit] Google login successful: ${user.email}');
       emit(AuthState.authenticated(user));
     } on AuthServiceException catch (e) {
+      debugPrint('[AuthCubit] AuthServiceException: ${e.message}');
       emit(AuthState.error(e.message));
     } catch (e) {
+      debugPrint('[AuthCubit] Unknown error: $e');
       emit(AuthState.error('Google login failed. Please try again.'));
     }
   }
 
   /// Register with email and password
   Future<void> register(String email, String password, {String? displayName}) async {
+    debugPrint('[AuthCubit] Register attempt for: $email');
+
     if (email.isEmpty || password.isEmpty) {
       emit(AuthState.error('Please enter email and password'));
       return;
@@ -79,10 +95,13 @@ class AuthCubit extends Cubit<AuthState> {
         password: password,
         displayName: displayName,
       );
+      debugPrint('[AuthCubit] Registration successful: ${user.email}');
       emit(AuthState.authenticated(user));
     } on AuthServiceException catch (e) {
+      debugPrint('[AuthCubit] AuthServiceException: ${e.message}');
       emit(AuthState.error(e.message));
     } catch (e) {
+      debugPrint('[AuthCubit] Unknown error: $e');
       emit(AuthState.error('Registration failed. Please try again.'));
     }
   }

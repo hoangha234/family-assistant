@@ -12,7 +12,20 @@
           "package_name": "com.example.family_assistant"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "518539965855-vsg70qn17b54v3s7uianks2pkaf4h8pc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.family_assistant",
+            "certificate_hash": "06c3b0683129ce54ad4ebae166a7dcaa63d543c4"
+          }
+        },
+        {
+          "client_id": "518539965855-isqm9pj2keohitv1dfgue8aja3ahlqi4.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyD6yfFNk6h3wwSPb6SbtEcpcKIpOIJRuj0"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "518539965855-isqm9pj2keohitv1dfgue8aja3ahlqi4.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "518539965855-ok5rvekssi2iqdlm13si7n2e93s3qvna.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.familyAssistant"
+              }
+            }
+          ]
         }
       }
     }

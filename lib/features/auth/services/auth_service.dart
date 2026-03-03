@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter/foundation.dart';
 import '../models/user_model.dart';
 
 /// Exception for auth service errors
@@ -23,9 +24,21 @@ class AuthService {
     GoogleSignIn? googleSignIn,
   })  : _firebaseAuth = firebaseAuth ?? FirebaseAuth.instance,
         _googleSignIn = googleSignIn ?? GoogleSignIn() {
-    // Disable app verification for development/testing
-    // Remove this in production
-    _firebaseAuth.setSettings(appVerificationDisabledForTesting: true);
+    _initializeAuth();
+  }
+
+  Future<void> _initializeAuth() async {
+    try {
+      // Disable app verification for development/testing
+      // This helps bypass reCAPTCHA on emulators and debug builds
+      await _firebaseAuth.setSettings(
+        appVerificationDisabledForTesting: true,
+        forceRecaptchaFlow: false,
+      );
+      debugPrint('[AuthService] Auth settings configured successfully');
+    } catch (e) {
+      debugPrint('[AuthService] Failed to set auth settings: $e');
+    }
   }
 
   /// Get current user
@@ -42,11 +55,14 @@ class AuthService {
     required String email,
     required String password,
   }) async {
+    debugPrint('[AuthService] Attempting login for: $email');
     try {
       final credential = await _firebaseAuth.signInWithEmailAndPassword(
         email: email.trim(),
         password: password,
       );
+
+      debugPrint('[AuthService] Login successful for: ${credential.user?.email}');
 
       if (credential.user == null) {
         throw AuthServiceException('Login failed: No user returned');
@@ -54,11 +70,13 @@ class AuthService {
 
       return UserModel.fromFirebaseUser(credential.user!);
     } on FirebaseAuthException catch (e) {
+      debugPrint('[AuthService] FirebaseAuthException: ${e.code} - ${e.message}');
       throw AuthServiceException(
         _getErrorMessage(e.code),
         code: e.code,
       );
     } catch (e) {
+      debugPrint('[AuthService] Login error: $e');
       if (e is AuthServiceException) rethrow;
       throw AuthServiceException('Login failed: $e');
     }
@@ -70,11 +88,14 @@ class AuthService {
     required String password,
     String? displayName,
   }) async {
+    debugPrint('[AuthService] Attempting registration for: $email');
     try {
       final credential = await _firebaseAuth.createUserWithEmailAndPassword(
         email: email.trim(),
         password: password,
       );
+
+      debugPrint('[AuthService] Registration successful for: ${credential.user?.email}');
 
       if (credential.user == null) {
         throw AuthServiceException('Registration failed: No user returned');
@@ -83,15 +104,18 @@ class AuthService {
       // Update display name if provided
       if (displayName != null && displayName.isNotEmpty) {
         await credential.user!.updateDisplayName(displayName);
+        debugPrint('[AuthService] Display name updated to: $displayName');
       }
 
       return UserModel.fromFirebaseUser(credential.user!);
     } on FirebaseAuthException catch (e) {
+      debugPrint('[AuthService] FirebaseAuthException: ${e.code} - ${e.message}');
       throw AuthServiceException(
         _getErrorMessage(e.code),
         code: e.code,
       );
     } catch (e) {
+      debugPrint('[AuthService] Registration error: $e');
       if (e is AuthServiceException) rethrow;
       throw AuthServiceException('Registration failed: $e');
     }

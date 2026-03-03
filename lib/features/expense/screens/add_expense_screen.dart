@@ -3,14 +3,23 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../cubit/add_expense_cubit.dart';
+import '../category/cubit/category_budget_cubit.dart';
 
 class AddExpenseScreen extends StatelessWidget {
-  const AddExpenseScreen({super.key});
+  final CategoryBudgetCubit? categoryBudgetCubit;
+
+  const AddExpenseScreen({super.key, this.categoryBudgetCubit});
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => AddExpenseCubit(),
+      create: (context) {
+        final cubit = AddExpenseCubit();
+        if (categoryBudgetCubit != null) {
+          cubit.setCategoryBudgetCubit(categoryBudgetCubit!);
+        }
+        return cubit;
+      },
       child: const AddExpenseView(),
     );
   }
@@ -27,9 +36,12 @@ class AddExpenseView extends StatelessWidget {
   final List<Map<String, dynamic>> _categories = const [
     {'name': 'Food', 'icon': Icons.restaurant},
     {'name': 'Transport', 'icon': Icons.directions_car},
-    {'name': 'Rent', 'icon': Icons.home},
     {'name': 'Shopping', 'icon': Icons.shopping_bag},
-    {'name': 'Health', 'icon': Icons.health_and_safety},
+    {'name': 'Entertainment', 'icon': Icons.movie},
+    {'name': 'Bills', 'icon': Icons.receipt},
+    {'name': 'Health', 'icon': Icons.medical_services},
+    {'name': 'Education', 'icon': Icons.school},
+    {'name': 'Other', 'icon': Icons.more_horiz},
   ];
 
   String _getFormattedAmount(String amount) {

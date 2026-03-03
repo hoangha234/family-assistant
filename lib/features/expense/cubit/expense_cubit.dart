@@ -6,13 +6,24 @@ import '../services/expense_service.dart';
 
 part 'expense_state.dart';
 
+/// Callback type for notifying when expenses change
+typedef OnExpensesChangedCallback = void Function(double totalBalance);
+
 class ExpenseCubit extends Cubit<ExpenseState> {
   final ExpenseService _expenseService;
   StreamSubscription<List<Expense>>? _expensesSubscription;
 
+  /// Callback to notify CategoryBudgetCubit when expenses change
+  OnExpensesChangedCallback? onExpensesChanged;
+
   ExpenseCubit({ExpenseService? expenseService})
       : _expenseService = expenseService ?? ExpenseService(),
         super(const ExpenseState());
+
+  /// Set callback for expense changes (used by CategoryBudgetCubit)
+  void setOnExpensesChangedCallback(OnExpensesChangedCallback callback) {
+    onExpensesChanged = callback;
+  }
 
   /// Initialize cubit and start listening to expenses
   void initialize() {
@@ -54,6 +65,9 @@ class ExpenseCubit extends Cubit<ExpenseState> {
       categoryTotals: categoryTotals,
       recentTransactions: recentTransactions,
     ));
+
+    // Notify CategoryBudgetCubit about the change
+    onExpensesChanged?.call(totalBalance);
   }
 
   /// Set selected month

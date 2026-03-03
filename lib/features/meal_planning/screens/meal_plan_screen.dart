@@ -1,8 +1,11 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:math' as math;
 import '../cubit/meal_plan_cubit.dart';
+import '../models/meal_model.dart';
+import 'meal_detail_screen.dart';
 
 class MealPlanScreen extends StatelessWidget {
   const MealPlanScreen({super.key});
@@ -10,7 +13,7 @@ class MealPlanScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => MealPlanCubit(),
+      create: (context) => MealPlanCubit()..loadMeals(),
       child: const MealPlanView(),
     );
   }
@@ -31,7 +34,19 @@ class MealPlanView extends StatelessWidget {
     final textColor = isDarkMode ? Colors.white : textDark;
     final cardColor = isDarkMode ? Colors.grey[800]! : Colors.white;
 
-    return BlocBuilder<MealPlanCubit, MealPlanState>(
+    return BlocConsumer<MealPlanCubit, MealPlanState>(
+      listener: (context, state) {
+        // Show error snackbar if needed
+        if (state.errorMessage != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.errorMessage!),
+              backgroundColor: Colors.red,
+            ),
+          );
+          context.read<MealPlanCubit>().clearError();
+        }
+      },
       builder: (context, state) {
         return Scaffold(
           backgroundColor: backgroundColor,
@@ -41,48 +56,50 @@ class MealPlanView extends StatelessWidget {
                 bottom: false,
                 child: Column(
                   children: [
-                    _buildTopBar(textColor),
+                    _buildTopBar(context, textColor),
                     _buildDateStrip(context, state, isDarkMode),
                     Expanded(
                       child: SingleChildScrollView(
                         padding: const EdgeInsets.only(bottom: 100),
                         child: Column(
                           children: [
-                            _buildNutritionSummary(cardColor, textColor, isDarkMode, primaryColor),
+                            _buildNutritionSummary(state, cardColor, textColor, isDarkMode, primaryColor),
                             _buildSectionHeader("Today's Meals", textColor, primaryColor),
                             Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 16),
                               child: Column(
                                 children: [
-                                  _buildMealCard(
-                                    title: "Avocado Toast & Eggs",
-                                    type: "Breakfast",
-                                    kcal: "450",
-                                    carbs: "40g",
-                                    protein: "12g",
-                                    fat: "25g",
-                                    imageUrl: "https://images.unsplash.com/photo-1525351484163-7529414395d8?auto=format&fit=crop&w=800&q=80",
+                                  // Breakfast
+                                  _buildMealSlot(
+                                    context: context,
+                                    meal: state.getMealByType(MealType.breakfast),
+                                    mealType: MealType.breakfast,
                                     cardColor: cardColor,
                                     textColor: textColor,
-                                    primaryColor: primaryColor,
+                                    isDarkMode: isDarkMode,
                                   ),
                                   const SizedBox(height: 16),
-                                  _buildMealCard(
-                                    title: "Grilled Chicken Salad",
-                                    type: "Lunch",
-                                    kcal: "600",
-                                    carbs: "15g",
-                                    protein: "45g",
-                                    fat: "18g",
-                                    imageUrl: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80",
+                                  // Lunch
+                                  _buildMealSlot(
+                                    context: context,
+                                    meal: state.getMealByType(MealType.lunch),
+                                    mealType: MealType.lunch,
                                     cardColor: cardColor,
                                     textColor: textColor,
-                                    primaryColor: primaryColor,
+                                    isDarkMode: isDarkMode,
                                   ),
                                   const SizedBox(height: 16),
-                                  _buildEmptyMealCard("Dinner", cardColor, isDarkMode, primaryColor),
+                                  // Dinner
+                                  _buildMealSlot(
+                                    context: context,
+                                    meal: state.getMealByType(MealType.dinner),
+                                    mealType: MealType.dinner,
+                                    cardColor: cardColor,
+                                    textColor: textColor,
+                                    isDarkMode: isDarkMode,
+                                  ),
                                   const SizedBox(height: 24),
-                                  _buildAskAIButton(primaryColor),
+                                  _buildAskAIButton(context, primaryColor),
                                 ],
                               ),
                             ),
@@ -93,7 +110,6 @@ class MealPlanView extends StatelessWidget {
                   ],
                 ),
               ),
-
             ],
           ),
         );
@@ -101,13 +117,58 @@ class MealPlanView extends StatelessWidget {
     );
   }
 
-  Widget _buildTopBar(Color textColor) {
+  /// Build meal slot - either meal card or empty card
+  Widget _buildMealSlot({
+    required BuildContext context,
+    required MealModel? meal,
+    required MealType mealType,
+    required Color cardColor,
+    required Color textColor,
+    required bool isDarkMode,
+  }) {
+    if (meal != null) {
+      return _buildMealCard(
+        title: meal.name,
+        type: meal.type.displayName,
+        kcal: meal.calories.toString(),
+        carbs: "${meal.carbs}g",
+        protein: "${meal.protein}g",
+        fat: "${meal.fats}g",
+        imageUrl: meal.imageUrl,
+        imageBytes: meal.imageBytes,
+        cardColor: cardColor,
+        textColor: textColor,
+        primaryColor: primaryColor,
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => MealDetailScreen(meal: meal),
+            ),
+          );
+        },
+      );
+    } else {
+      return _buildEmptyMealCard(
+        mealType.displayName,
+        cardColor,
+        isDarkMode,
+        primaryColor,
+        onTap: () => _showAIBottomSheet(context, mealType),
+      );
+    }
+  }
+
+  Widget _buildTopBar(BuildContext context, Color textColor) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Icon(Icons.arrow_back_ios, color: textColor, size: 20),
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Icon(Icons.arrow_back_ios, color: textColor, size: 20),
+          ),
           Text(
             "Daily Meal Planner",
             style: GoogleFonts.manrope(
@@ -160,7 +221,7 @@ class MealPlanView extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withAlpha(13),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   )
@@ -195,7 +256,11 @@ class MealPlanView extends StatelessWidget {
     );
   }
 
-  Widget _buildNutritionSummary(Color cardColor, Color textColor, bool isDarkMode, Color primaryColor) {
+  Widget _buildNutritionSummary(MealPlanState state, Color cardColor, Color textColor, bool isDarkMode, Color primaryColor) {
+    final totalCalories = state.totalCalories;
+    final progress = state.calorieProgress;
+    final progressPercent = (progress * 100).toInt();
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Container(
@@ -203,7 +268,7 @@ class MealPlanView extends StatelessWidget {
         decoration: BoxDecoration(
           color: cardColor,
           borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)],
+          boxShadow: [BoxShadow(color: Colors.black.withAlpha(13), blurRadius: 4)],
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -224,7 +289,7 @@ class MealPlanView extends StatelessWidget {
                   text: TextSpan(
                     children: [
                       TextSpan(
-                        text: "1,450 ",
+                        text: "$totalCalories ",
                         style: GoogleFonts.manrope(
                           fontSize: 24,
                           fontWeight: FontWeight.w900,
@@ -245,11 +310,11 @@ class MealPlanView extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: primaryColor.withOpacity(0.2),
+                    color: primaryColor.withAlpha(51),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    "72% of goal",
+                    "$progressPercent% of goal",
                     style: GoogleFonts.manrope(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
@@ -266,7 +331,7 @@ class MealPlanView extends StatelessWidget {
                 fit: StackFit.expand,
                 children: [
                   CircularProgressIndicator(
-                    value: 0.72,
+                    value: progress,
                     strokeWidth: 8,
                     backgroundColor: isDarkMode ? Colors.grey[700] : Colors.grey[100],
                     color: primaryColor,
@@ -274,7 +339,7 @@ class MealPlanView extends StatelessWidget {
                   ),
                   Center(
                     child: Text(
-                      "72%",
+                      "$progressPercent%",
                       style: GoogleFonts.manrope(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
@@ -326,92 +391,176 @@ class MealPlanView extends StatelessWidget {
     required String protein,
     required String fat,
     required String imageUrl,
+    Uint8List? imageBytes,
     required Color cardColor,
     required Color textColor,
     required Color primaryColor,
+    VoidCallback? onTap,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)],
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [BoxShadow(color: Colors.black.withAlpha(13), blurRadius: 4)],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              child: _buildMealImage(
+                imageUrl: imageUrl,
+                imageBytes: imageBytes,
+                type: type,
+                primaryColor: primaryColor,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              type.toUpperCase(),
+                              style: GoogleFonts.manrope(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: primaryColor,
+                                letterSpacing: 1.0,
+                              ),
+                            ),
+                            Text(
+                              title,
+                              style: GoogleFonts.manrope(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: textColor,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      RichText(
+                        text: TextSpan(
+                          children: [
+                            TextSpan(
+                              text: kcal,
+                              style: GoogleFonts.manrope(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: textColor,
+                              ),
+                            ),
+                            TextSpan(
+                              text: " kcal",
+                              style: GoogleFonts.manrope(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      _buildMacroItem("Carbs", carbs, primaryColor),
+                      const SizedBox(width: 16),
+                      _buildMacroItem("Protein", protein, primaryColor),
+                      const SizedBox(width: 16),
+                      _buildMacroItem("Fat", fat, primaryColor),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-            child: Image.network(
-              imageUrl,
-              height: 160,
-              width: double.infinity,
-              fit: BoxFit.cover,
+    );
+  }
+
+  /// Build meal image - uses AI-generated bytes if available, otherwise network image
+  Widget _buildMealImage({
+    required String imageUrl,
+    Uint8List? imageBytes,
+    required String type,
+    required Color primaryColor,
+  }) {
+    // If we have AI-generated image bytes, use them
+    if (imageBytes != null && imageBytes.isNotEmpty) {
+      return Image.memory(
+        imageBytes,
+        height: 160,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return _buildImagePlaceholder(type, primaryColor);
+        },
+      );
+    }
+
+    // Otherwise fall back to network image
+    return Image.network(
+      imageUrl,
+      height: 160,
+      width: double.infinity,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        return _buildImagePlaceholder(type, primaryColor);
+      },
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return Container(
+          height: 160,
+          width: double.infinity,
+          color: Colors.grey.withAlpha(30),
+          child: Center(
+            child: CircularProgressIndicator(
+              value: loadingProgress.expectedTotalBytes != null
+                  ? loadingProgress.cumulativeBytesLoaded /
+                      loadingProgress.expectedTotalBytes!
+                  : null,
+              color: primaryColor,
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          type.toUpperCase(),
-                          style: GoogleFonts.manrope(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: primaryColor,
-                            letterSpacing: 1.0,
-                          ),
-                        ),
-                        Text(
-                          title,
-                          style: GoogleFonts.manrope(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: textColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                    RichText(
-                      text: TextSpan(
-                        children: [
-                          TextSpan(
-                            text: kcal,
-                            style: GoogleFonts.manrope(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: textColor,
-                            ),
-                          ),
-                          TextSpan(
-                            text: " kcal",
-                            style: GoogleFonts.manrope(
-                              fontSize: 12,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    _buildMacroItem("Carbs", carbs, primaryColor),
-                    const SizedBox(width: 16),
-                    _buildMacroItem("Protein", protein, primaryColor),
-                    const SizedBox(width: 16),
-                    _buildMacroItem("Fat", fat, primaryColor),
-                  ],
-                ),
-              ],
+        );
+      },
+    );
+  }
+
+  /// Build placeholder when image fails to load
+  Widget _buildImagePlaceholder(String type, Color primaryColor) {
+    return Container(
+      height: 160,
+      width: double.infinity,
+      color: primaryColor.withAlpha(30),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.restaurant, size: 48, color: primaryColor),
+          const SizedBox(height: 8),
+          Text(
+            type,
+            style: GoogleFonts.manrope(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: primaryColor,
             ),
           ),
         ],
@@ -436,60 +585,63 @@ class MealPlanView extends StatelessWidget {
     );
   }
 
-  Widget _buildEmptyMealCard(String mealName, Color cardColor, bool isDarkMode, Color primaryColor) {
-    return CustomPaint(
-      painter: DashedRectPainter(
-        color: isDarkMode ? Colors.grey[700]! : Colors.grey[300]!,
-        strokeWidth: 2,
-        gap: 5,
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: cardColor,
-          borderRadius: BorderRadius.circular(16),
+  Widget _buildEmptyMealCard(String mealName, Color cardColor, bool isDarkMode, Color primaryColor, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: CustomPaint(
+        painter: DashedRectPainter(
+          color: isDarkMode ? Colors.grey[700]! : Colors.grey[300]!,
+          strokeWidth: 2,
+          gap: 5,
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  mealName.toUpperCase(),
-                  style: GoogleFonts.manrope(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey[400],
-                    letterSpacing: 1.0,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: cardColor,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    mealName.toUpperCase(),
+                    style: GoogleFonts.manrope(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[400],
+                      letterSpacing: 1.0,
+                    ),
                   ),
-                ),
-                Text(
-                  "Plan your dinner",
-                  style: GoogleFonts.manrope(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey[400],
+                  Text(
+                    "Plan your ${mealName.toLowerCase()}",
+                    style: GoogleFonts.manrope(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[400],
+                    ),
                   ),
-                ),
-              ],
-            ),
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: primaryColor.withOpacity(0.1),
-                shape: BoxShape.circle,
+                ],
               ),
-              child: Icon(Icons.add, color: primaryColor),
-            ),
-          ],
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: primaryColor.withAlpha(26),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.add, color: primaryColor),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildAskAIButton(Color primaryColor) {
+  Widget _buildAskAIButton(BuildContext context, Color primaryColor) {
     return Column(
       children: [
         Container(
@@ -499,14 +651,14 @@ class MealPlanView extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: primaryColor.withOpacity(0.4),
+                color: primaryColor.withAlpha(102),
                 blurRadius: 15,
                 spreadRadius: 0,
               ),
             ],
           ),
           child: ElevatedButton(
-            onPressed: () {},
+            onPressed: () => _showAIBottomSheet(context, null),
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryColor,
               shape: RoundedRectangleBorder(
@@ -540,11 +692,447 @@ class MealPlanView extends StatelessWidget {
     );
   }
 
+  /// Show AI meal generation bottom sheet
+  void _showAIBottomSheet(BuildContext context, MealType? preselectedType) {
+    final cubit = context.read<MealPlanCubit>();
+    if (preselectedType != null) {
+      cubit.setMealType(preselectedType);
+    }
 
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (bottomSheetContext) {
+        return BlocProvider.value(
+          value: cubit,
+          child: _AIBottomSheetContent(
+            primaryColor: primaryColor,
+            preselectedType: preselectedType,
+          ),
+        );
+      },
+    );
+  }
+}
 
+/// AI Bottom Sheet Content Widget
+class _AIBottomSheetContent extends StatefulWidget {
+  final Color primaryColor;
+  final MealType? preselectedType;
 
+  const _AIBottomSheetContent({
+    required this.primaryColor,
+    this.preselectedType,
+  });
 
+  @override
+  State<_AIBottomSheetContent> createState() => _AIBottomSheetContentState();
+}
 
+class _AIBottomSheetContentState extends State<_AIBottomSheetContent> {
+  final TextEditingController _ingredientsController = TextEditingController();
+  MealType _selectedMealType = MealType.lunch;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedMealType = widget.preselectedType ?? MealType.lunch;
+  }
+
+  @override
+  void dispose() {
+    _ingredientsController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final backgroundColor = isDarkMode ? const Color(0xFF1A2E24) : Colors.white;
+    final textColor = isDarkMode ? Colors.white : const Color(0xFF111814);
+    final mutedColor = isDarkMode ? Colors.grey[400]! : Colors.grey[600]!;
+
+    return BlocConsumer<MealPlanCubit, MealPlanState>(
+      listener: (context, state) {
+        // Close bottom sheet after adding meal
+        if (state.generatedPreview == null && state.meals.isNotEmpty && !state.isGenerating) {
+          // Meal was added, can close
+        }
+      },
+      builder: (context, state) {
+        return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.85,
+          ),
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SingleChildScrollView(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Handle bar
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[400],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Title
+                  Row(
+                    children: [
+                      Icon(Icons.auto_awesome, color: widget.primaryColor, size: 28),
+                      const SizedBox(width: 12),
+                      Text(
+                        "AI Meal Suggestion",
+                        style: GoogleFonts.manrope(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: textColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "Tell me what ingredients you have, and I'll create a delicious recipe for you!",
+                    style: GoogleFonts.manrope(
+                      fontSize: 14,
+                      color: mutedColor,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Meal Type Selector
+                  Text(
+                    "Meal Type",
+                    style: GoogleFonts.manrope(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: textColor,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: MealType.values.where((t) => t != MealType.snack).map((type) {
+                      final isSelected = _selectedMealType == type;
+                      return Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() => _selectedMealType = type);
+                            context.read<MealPlanCubit>().setMealType(type);
+                          },
+                          child: Container(
+                            margin: const EdgeInsets.only(right: 8),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? widget.primaryColor
+                                  : (isDarkMode ? Colors.grey[800] : Colors.grey[100]),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              type.displayName,
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.manrope(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: isSelected
+                                    ? const Color(0xFF111814)
+                                    : mutedColor,
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Ingredients Input
+                  Text(
+                    "Your Ingredients",
+                    style: GoogleFonts.manrope(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: textColor,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _ingredientsController,
+                    maxLines: 3,
+                    style: GoogleFonts.manrope(color: textColor),
+                    decoration: InputDecoration(
+                      hintText: "e.g., chicken, broccoli, garlic, olive oil...",
+                      hintStyle: GoogleFonts.manrope(color: mutedColor),
+                      filled: true,
+                      fillColor: isDarkMode ? Colors.grey[800] : Colors.grey[100],
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: widget.primaryColor, width: 2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Generate Button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: state.isGenerating
+                          ? null
+                          : () {
+                              context.read<MealPlanCubit>().getMealSuggestion(
+                                _ingredientsController.text,
+                              );
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: widget.primaryColor,
+                        disabledBackgroundColor: widget.primaryColor.withAlpha(128),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: state.isGenerating
+                          ? Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: const Color(0xFF111814),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  "Generating...",
+                                  style: GoogleFonts.manrope(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: const Color(0xFF111814),
+                                  ),
+                                ),
+                              ],
+                            )
+                          : Text(
+                              "Generate Recipe",
+                              style: GoogleFonts.manrope(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF111814),
+                              ),
+                            ),
+                    ),
+                  ),
+
+                  // Preview Card
+                  if (state.generatedPreview != null) ...[
+                    const SizedBox(height: 24),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isDarkMode ? Colors.grey[800] : Colors.grey[100],
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: widget.primaryColor, width: 2),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (state.generatedPreview?.imageBytes != null)
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.memory(
+                                state.generatedPreview!.imageBytes!,
+                                height: 160,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                              ),
+                            )
+                          else if (state.isGenerating)
+                             Container(
+                                height: 160,
+                                width: double.infinity,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[800],
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Center(
+                                  child: CircularProgressIndicator(color: widget.primaryColor),
+                                ),
+                              ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Icon(Icons.check_circle, color: widget.primaryColor),
+                              const SizedBox(width: 8),
+                              Text(
+                                "Recipe Generated!",
+                                style: GoogleFonts.manrope(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: widget.primaryColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            state.generatedPreview!.name,
+                            style: GoogleFonts.manrope(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: textColor,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            state.generatedPreview!.description,
+                            style: GoogleFonts.manrope(
+                              fontSize: 12,
+                              color: mutedColor,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              _buildMiniMacro("🔥", "${state.generatedPreview!.calories} kcal", textColor),
+                              const SizedBox(width: 16),
+                              _buildMiniMacro("💪", "${state.generatedPreview!.protein}g protein", textColor),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: state.isGenerating
+                                    ? null
+                                    : () {
+                                      context.read<MealPlanCubit>().getMealSuggestion(
+                                        _ingredientsController.text,
+                                      );
+                                    },
+                                  style: OutlinedButton.styleFrom(
+                                    side: BorderSide(color: widget.primaryColor),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                  ),
+                                  child: Text(
+                                    "Regenerate",
+                                    style: GoogleFonts.manrope(
+                                      fontWeight: FontWeight.bold,
+                                      color: widget.primaryColor,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: () {
+                                    context.read<MealPlanCubit>().addGeneratedMealToToday();
+                                    Navigator.pop(context);
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: widget.primaryColor,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                  ),
+                                  child: Text(
+                                    "Add to Today",
+                                    style: GoogleFonts.manrope(
+                                      fontWeight: FontWeight.bold,
+                                      color: const Color(0xFF111814),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  // Error Message
+                  if (state.errorMessage != null && state.generatedPreview == null) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withAlpha(26),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error_outline, color: Colors.red, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              state.errorMessage!,
+                              style: GoogleFonts.manrope(
+                                fontSize: 12,
+                                color: Colors.red,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMiniMacro(String emoji, String text, Color textColor) {
+    return Row(
+      children: [
+        Text(emoji, style: const TextStyle(fontSize: 14)),
+        const SizedBox(width: 4),
+        Text(
+          text,
+          style: GoogleFonts.manrope(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: textColor,
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class DashedRectPainter extends CustomPainter {
@@ -565,34 +1153,34 @@ class DashedRectPainter extends CustomPainter {
     double x = size.width;
     double y = size.height;
 
-    Path _topPath = getDashedPath(
+    Path topPath = getDashedPath(
       a: const math.Point(0, 0),
       b: math.Point(x, 0),
       gap: gap,
     );
 
-    Path _rightPath = getDashedPath(
+    Path rightPath = getDashedPath(
       a: math.Point(x, 0),
       b: math.Point(x, y),
       gap: gap,
     );
 
-    Path _bottomPath = getDashedPath(
+    Path bottomPath = getDashedPath(
       a: math.Point(0, y),
       b: math.Point(x, y),
       gap: gap,
     );
 
-    Path _leftPath = getDashedPath(
+    Path leftPath = getDashedPath(
       a: const math.Point(0, 0),
       b: math.Point(0, y),
       gap: gap,
     );
 
-    canvas.drawPath(_topPath, dashedPaint);
-    canvas.drawPath(_rightPath, dashedPaint);
-    canvas.drawPath(_bottomPath, dashedPaint);
-    canvas.drawPath(_leftPath, dashedPaint);
+    canvas.drawPath(topPath, dashedPaint);
+    canvas.drawPath(rightPath, dashedPaint);
+    canvas.drawPath(bottomPath, dashedPaint);
+    canvas.drawPath(leftPath, dashedPaint);
   }
 
   Path getDashedPath({

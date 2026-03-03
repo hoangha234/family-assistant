@@ -3,6 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../cubit/expense_cubit.dart';
+import '../category/cubit/category_budget_cubit.dart';
+import '../category/cubit/category_budget_state.dart';
+import '../category/models/category_budget_model.dart';
 import 'add_expense_screen.dart';
 import 'report_screen.dart';
 
@@ -11,23 +14,53 @@ class ExpenseScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) => ExpenseCubit()..initialize(),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (context) => ExpenseCubit()..initialize(),
+        ),
+        BlocProvider(
+          create: (context) => CategoryBudgetCubit()..initialize(),
+        ),
+      ],
       child: const ExpenseView(),
     );
   }
 }
 
-class ExpenseView extends StatelessWidget {
+class ExpenseView extends StatefulWidget {
   const ExpenseView({super.key});
 
+  @override
+  State<ExpenseView> createState() => _ExpenseViewState();
+}
+
+class _ExpenseViewState extends State<ExpenseView> {
   final Color primaryColor = const Color(0xFF0694F9);
   final Color bgLight = const Color(0xFFF5F7F8);
   final Color bgDark = const Color(0xFF0F1B23);
   final Color successColor = const Color(0xFF22C55E);
+  final Color warningColor = const Color(0xFFFACC15);
   final Color errorColor = const Color(0xFFEF4444);
+  final Color dangerColor = const Color(0xFFDC2626);
   final Color textDark = const Color(0xFF111518);
   final Color textGrey = const Color(0xFF5F798C);
+
+  @override
+  void initState() {
+    super.initState();
+    // Link ExpenseCubit to CategoryBudgetCubit
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final expenseCubit = context.read<ExpenseCubit>();
+      final categoryBudgetCubit = context.read<CategoryBudgetCubit>();
+
+      // When expenses change, update category budgets
+      expenseCubit.setOnExpensesChangedCallback((totalBalance) {
+        categoryBudgetCubit.updateTotalBalance(totalBalance);
+        categoryBudgetCubit.recalculateAllCategories();
+      });
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,55 +68,81 @@ class ExpenseView extends StatelessWidget {
     final Color backgroundColor = isDarkMode ? bgDark : bgLight;
     final Color textColor = isDarkMode ? Colors.white : textDark;
 
-    return BlocBuilder<ExpenseCubit, ExpenseState>(
-      builder: (context, state) {
-        return Scaffold(
-          backgroundColor: backgroundColor,
-          appBar: AppBar(
-            backgroundColor: isDarkMode ? bgDark : Colors.white,
-            elevation: 0,
-            leading: IconButton(
-              icon: Icon(Icons.arrow_back_ios, color: textColor, size: 20),
-              onPressed: () => Navigator.pop(context),
+    return BlocConsumer<CategoryBudgetCubit, CategoryBudgetState>(
+      listener: (context, categoryState) {
+        // Show validation error snackbar
+        if (categoryState is CategoryBudgetValidationError) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(categoryState.errorMessage),
+              backgroundColor: errorColor,
+              duration: const Duration(seconds: 3),
             ),
-            title: Text(
-              'Expense Overview',
-              style: GoogleFonts.manrope(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: textColor,
-              ),
+          );
+        }
+        // Show success message
+        if (categoryState is CategoryBudgetUpdateSuccess) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(categoryState.message),
+              backgroundColor: successColor,
+              duration: const Duration(seconds: 2),
             ),
-            actions: [
-              IconButton(
-                icon: Icon(Icons.notifications_outlined, color: textColor),
-                onPressed: () {},
-              ),
-            ],
-          ),
-          body: SafeArea(
-            child: Column(
-              children: [
-                _buildMonthSelector(context, state, isDarkMode),
-                Expanded(
-                  child: state.isLoading
-                      ? const Center(child: CircularProgressIndicator())
-                      : SingleChildScrollView(
-                    padding: const EdgeInsets.only(bottom: 24),
-                    child: Column(
-                      children: [
-                        _buildBalanceCard(state),
-                        _buildAIInsight(),
-                        _buildBudgetUtilization(state, textColor, isDarkMode),
-                        _buildQuickActions(context, textColor, isDarkMode),
-                        _buildRecentTransactions(state, textColor, isDarkMode),
-                      ],
-                    ),
+          );
+        }
+      },
+      builder: (context, categoryState) {
+        return BlocBuilder<ExpenseCubit, ExpenseState>(
+          builder: (context, state) {
+            return Scaffold(
+              backgroundColor: backgroundColor,
+              appBar: AppBar(
+                backgroundColor: isDarkMode ? bgDark : Colors.white,
+                elevation: 0,
+                leading: IconButton(
+                  icon: Icon(Icons.arrow_back_ios, color: textColor, size: 20),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                title: Text(
+                  'Expense Overview',
+                  style: GoogleFonts.manrope(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: textColor,
                   ),
                 ),
-              ],
-            ),
-          ),
+                actions: [
+                  IconButton(
+                    icon: Icon(Icons.notifications_outlined, color: textColor),
+                    onPressed: () {},
+                  ),
+                ],
+              ),
+              body: SafeArea(
+                child: Column(
+                  children: [
+                    _buildMonthSelector(context, state, isDarkMode),
+                    Expanded(
+                      child: state.isLoading
+                          ? const Center(child: CircularProgressIndicator())
+                          : SingleChildScrollView(
+                        padding: const EdgeInsets.only(bottom: 24),
+                        child: Column(
+                          children: [
+                            _buildBalanceCard(state),
+                            _buildAIInsight(),
+                            _buildJarBudgetUtilization(context, categoryState, textColor, isDarkMode),
+                            _buildQuickActions(context, textColor, isDarkMode),
+                            _buildRecentTransactions(state, textColor, isDarkMode),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );
@@ -311,8 +370,18 @@ class ExpenseView extends StatelessWidget {
   }
 
   Widget _buildBudgetUtilization(ExpenseState state, Color textColor, bool isDarkMode) {
+    // This method is deprecated, use _buildJarBudgetUtilization instead
+    return const SizedBox.shrink();
+  }
+
+  /// NEW: Jar Budget System UI
+  Widget _buildJarBudgetUtilization(
+    BuildContext context,
+    CategoryBudgetState categoryState,
+    Color textColor,
+    bool isDarkMode,
+  ) {
     final formatter = NumberFormat.currency(symbol: '\$', decimalDigits: 0);
-    final topCategories = state.topCategories.take(3).toList();
 
     return Column(
       children: [
@@ -322,68 +391,367 @@ class ExpenseView extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Budget Utilization',
+                'Budget Jars',
                 style: GoogleFonts.manrope(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: textColor,
                 ),
               ),
-              Text(
-                'See All',
-                style: GoogleFonts.manrope(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: primaryColor,
+              if (categoryState is CategoryBudgetLoaded)
+                Text(
+                  'Allocated: ${formatter.format(categoryState.totalAllocatedBudget)}',
+                  style: GoogleFonts.manrope(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: textGrey,
+                  ),
                 ),
-              ),
             ],
           ),
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Column(
-            children: topCategories.isEmpty
-                ? [
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: isDarkMode ? const Color(0xFF1A2737) : Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Center(
-                        child: Text(
-                          'No expenses yet',
-                          style: GoogleFonts.manrope(color: textGrey),
-                        ),
-                      ),
-                    ),
-                  ]
-                : topCategories.asMap().entries.map((entry) {
-                    final category = entry.value.key;
-                    final amount = entry.value.value;
-                    final percent = state.getCategoryPercentage(category) / 100;
-                    final icon = _getCategoryIcon(category);
-
-                    return Padding(
-                      padding: EdgeInsets.only(bottom: entry.key < topCategories.length - 1 ? 8 : 0),
-                      child: _buildProgressBarItem(
-                        icon: icon,
-                        title: category,
-                        spent: formatter.format(amount),
-                        total: formatter.format(amount),
-                        percent: percent.clamp(0.0, 1.0),
-                        color: percent >= 1.0 ? successColor : primaryColor,
-                        statusText: '${(percent * 100).toStringAsFixed(0)}% of expenses',
-                        statusColor: textGrey,
-                        textColor: textColor,
-                        isDarkMode: isDarkMode,
-                      ),
-                    );
-                  }).toList(),
-          ),
+          child: _buildCategoryBudgetList(context, categoryState, textColor, isDarkMode),
         ),
       ],
+    );
+  }
+
+  Widget _buildCategoryBudgetList(
+    BuildContext context,
+    CategoryBudgetState categoryState,
+    Color textColor,
+    bool isDarkMode,
+  ) {
+    if (categoryState is CategoryBudgetLoading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (categoryState is CategoryBudgetError) {
+      return Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: isDarkMode ? const Color(0xFF1A2737) : Colors.white,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Center(
+          child: Text(
+            categoryState.message,
+            style: GoogleFonts.manrope(color: errorColor),
+          ),
+        ),
+      );
+    }
+
+    List<CategoryBudget> categories = [];
+    if (categoryState is CategoryBudgetLoaded) {
+      categories = categoryState.categories;
+    } else if (categoryState is CategoryBudgetUpdating) {
+      categories = categoryState.categories;
+    } else if (categoryState is CategoryBudgetUpdateSuccess) {
+      categories = categoryState.categories;
+    } else if (categoryState is CategoryBudgetValidationError) {
+      categories = categoryState.categories;
+    }
+
+    if (categories.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: isDarkMode ? const Color(0xFF1A2737) : Colors.white,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Center(
+          child: Text(
+            'No budget categories yet',
+            style: GoogleFonts.manrope(color: textGrey),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      children: categories.asMap().entries.map((entry) {
+        final index = entry.key;
+        final category = entry.value;
+        final isUpdating = categoryState is CategoryBudgetUpdating &&
+            categoryState.updatingCategoryId == category.id;
+
+        return Padding(
+          padding: EdgeInsets.only(bottom: index < categories.length - 1 ? 8 : 0),
+          child: _buildJarBudgetCard(
+            context: context,
+            category: category,
+            textColor: textColor,
+            isDarkMode: isDarkMode,
+            isUpdating: isUpdating,
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildJarBudgetCard({
+    required BuildContext context,
+    required CategoryBudget category,
+    required Color textColor,
+    required bool isDarkMode,
+    bool isUpdating = false,
+  }) {
+    final formatter = NumberFormat.currency(symbol: '\$', decimalDigits: 0);
+    final icon = _getCategoryIcon(category.name);
+    final progressColor = _getProgressBarColor(category.status);
+    final percent = category.spendingPercentage.clamp(0.0, 1.5);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDarkMode ? const Color(0xFF1A2737) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: category.isOverspent
+              ? dangerColor.withAlpha(128)
+              : (isDarkMode ? Colors.white10 : Colors.grey[100]!),
+          width: category.isOverspent ? 2 : 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: progressColor.withAlpha(25),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(icon, size: 18, color: progressColor),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        category.name,
+                        style: GoogleFonts.manrope(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: textColor,
+                        ),
+                      ),
+                      Text(
+                        'Remaining: ${formatter.format(category.remainingAmount.clamp(0, double.infinity))}',
+                        style: GoogleFonts.manrope(
+                          fontSize: 11,
+                          color: category.isOverspent ? dangerColor : textGrey,
+                          fontWeight: category.isOverspent ? FontWeight.w600 : FontWeight.normal,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              // Edit budget button
+              IconButton(
+                icon: isUpdating
+                    ? SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: primaryColor,
+                        ),
+                      )
+                    : Icon(Icons.edit_outlined, size: 18, color: textGrey),
+                onPressed: isUpdating
+                    ? null
+                    : () => _showEditBudgetDialog(context, category),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Spent / Budget text
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '${formatter.format(category.totalSpent)} / ${formatter.format(category.monthlyBudget)}',
+                style: GoogleFonts.manrope(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: textColor,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: progressColor.withAlpha(25),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${category.spendingPercentageInt}%',
+                  style: GoogleFonts.manrope(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: progressColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Progress bar
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: LinearProgressIndicator(
+              value: percent.clamp(0.0, 1.0),
+              backgroundColor: const Color(0xFFDBE1E6),
+              valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+              minHeight: 8,
+            ),
+          ),
+          // Overspent warning
+          if (category.isOverspent) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, size: 14, color: dangerColor),
+                const SizedBox(width: 4),
+                Text(
+                  'Overspent by ${formatter.format(category.totalSpent - category.monthlyBudget)}',
+                  style: GoogleFonts.manrope(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: dangerColor,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Get progress bar color based on budget status
+  Color _getProgressBarColor(BudgetStatus status) {
+    switch (status) {
+      case BudgetStatus.safe:
+        return successColor;
+      case BudgetStatus.warning:
+        return warningColor;
+      case BudgetStatus.danger:
+        return errorColor;
+      case BudgetStatus.overspent:
+        return dangerColor;
+    }
+  }
+
+  /// Show edit budget dialog
+  void _showEditBudgetDialog(BuildContext context, CategoryBudget category) {
+    final controller = TextEditingController(
+      text: category.monthlyBudget.toStringAsFixed(0),
+    );
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    // Capture the cubit BEFORE showing dialog
+    final categoryBudgetCubit = context.read<CategoryBudgetCubit>();
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: isDarkMode ? const Color(0xFF1A2737) : Colors.white,
+          title: Text(
+            'Edit ${category.name} Budget',
+            style: GoogleFonts.manrope(
+              fontWeight: FontWeight.bold,
+              color: isDarkMode ? Colors.white : textDark,
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: controller,
+                keyboardType: TextInputType.number,
+                style: GoogleFonts.manrope(
+                  color: isDarkMode ? Colors.white : textDark,
+                ),
+                decoration: InputDecoration(
+                  labelText: 'Monthly Budget',
+                  prefixText: '\$ ',
+                  labelStyle: GoogleFonts.manrope(color: textGrey),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: primaryColor),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Current spent: \$${category.totalSpent.toStringAsFixed(0)}',
+                style: GoogleFonts.manrope(
+                  fontSize: 12,
+                  color: textGrey,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.manrope(color: textGrey),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryColor,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () async {
+                final newBudget = double.tryParse(controller.text) ?? 0;
+                print('[Dialog] Saving budget: categoryId=${category.id}, newBudget=$newBudget');
+                print('[Dialog] Category name: ${category.name}');
+
+                // Close dialog first
+                Navigator.pop(dialogContext);
+
+                // Then update the budget
+                try {
+                  await categoryBudgetCubit.updateCategoryBudget(
+                    category.id,
+                    newBudget,
+                  );
+                  print('[Dialog] Update completed');
+                } catch (e) {
+                  print('[Dialog] Update error: $e');
+                }
+              },
+              child: Text(
+                'Save',
+                style: GoogleFonts.manrope(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -393,13 +761,21 @@ class ExpenseView extends StatelessWidget {
         return Icons.restaurant;
       case 'transport':
         return Icons.directions_car;
+      case 'shopping':
+        return Icons.shopping_bag;
+      case 'entertainment':
+        return Icons.movie;
+      case 'bills':
+        return Icons.receipt;
+      case 'health':
+        return Icons.medical_services;
+      case 'education':
+        return Icons.school;
+      case 'other':
+        return Icons.more_horiz;
       case 'rent':
       case 'housing':
         return Icons.home;
-      case 'shopping':
-        return Icons.shopping_bag;
-      case 'health':
-        return Icons.health_and_safety;
       case 'groceries':
         return Icons.shopping_cart;
       default:
@@ -466,11 +842,22 @@ class ExpenseView extends StatelessWidget {
         children: [
           Expanded(
             child: GestureDetector(
-              onTap: () {
-                Navigator.push(
+              onTap: () async {
+                final categoryBudgetCubit = context.read<CategoryBudgetCubit>();
+                final result = await Navigator.push<bool>(
                   context,
-                  MaterialPageRoute(builder: (context) => const AddExpenseScreen()),
+                  MaterialPageRoute(
+                    builder: (context) => AddExpenseScreen(
+                      categoryBudgetCubit: categoryBudgetCubit,
+                    ),
+                  ),
                 );
+
+                // Force recalculate when returning from AddExpenseScreen
+                if (result == true && context.mounted) {
+                  print('[ExpenseScreen] Returned from AddExpense, recalculating...');
+                  categoryBudgetCubit.recalculateAllCategories();
+                }
               },
               child: _buildActionButton(
                 icon: Icons.add_circle,

@@ -2,15 +2,22 @@ import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import '../models/expense_model.dart';
 import '../services/expense_service.dart';
+import '../category/cubit/category_budget_cubit.dart';
 
 part 'add_expense_state.dart';
 
 class AddExpenseCubit extends Cubit<AddExpenseState> {
   final ExpenseService _expenseService;
+  CategoryBudgetCubit? _categoryBudgetCubit;
 
   AddExpenseCubit({ExpenseService? expenseService})
       : _expenseService = expenseService ?? ExpenseService(),
         super(const AddExpenseState());
+
+  /// Set CategoryBudgetCubit reference for integration
+  void setCategoryBudgetCubit(CategoryBudgetCubit cubit) {
+    _categoryBudgetCubit = cubit;
+  }
 
   void setTransactionType(String type) {
     emit(state.copyWith(transactionType: type));
@@ -79,6 +86,14 @@ class AddExpenseCubit extends Cubit<AddExpenseState> {
 
       // Save to Firestore
       await _expenseService.createExpense(expense);
+
+      // Notify CategoryBudgetCubit to recalculate
+      if (!state.isIncome) {
+        _categoryBudgetCubit?.onExpenseAdded(
+          state.selectedCategory,
+          state.amountValue,
+        );
+      }
 
       emit(state.copyWith(status: AddExpenseStatus.success));
       return true;
