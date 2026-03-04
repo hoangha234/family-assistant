@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
+import '../../../core/config/api_keys.dart';
 import '../models/ai_response_model.dart';
 
 /// Custom exception for AI service errors
@@ -41,8 +42,8 @@ class AIService {
   AIService({
     String? apiKey,
     String? model,
-  })  : _apiKey = apiKey ?? 'AIzaSyAoN8VqWrtYjm6L-nWWwvKdKnnRkKvpgrU',
-        _model = model ?? 'gemini-1.5-flash',
+  })  : _apiKey = apiKey ?? ApiKeys.geminiApiKey,
+        _model = model ?? 'gemini-2.0-flash',
         _httpClient = HttpClient();
 
   String get _currentApiVersion => _apiVersions[_currentApiVersionIndex];
@@ -581,89 +582,98 @@ You are allowed to be conversational and informal when appropriate.
     }
     _lastRequestTime = DateTime.now();
 
-    try {
-      // Use vision-capable model for image analysis
-      const visionModel = 'gemini-1.5-flash';
+    // Vision-capable models to try - using same model that works for chat
+    final visionModels = [
+      'gemini-2.0-flash',        // Current working model for chat
+      'gemini-2.0-flash-exp',    // Experimental with vision
+      'gemini-1.5-flash',
+      'gemini-pro-vision',
+    ];
 
-      final uri = Uri.parse(
-        'https://generativelanguage.googleapis.com/$_currentApiVersion/models/$visionModel:generateContent?key=$_apiKey',
-      );
+    // API versions to try
+    final apiVersions = ['v1beta', 'v1'];
 
-      final request = await _httpClient.postUrl(uri);
-      request.headers.set('Content-Type', 'application/json');
+    final prompt = messages.isNotEmpty ? messages.last.content : 'Analyze this image';
 
-      // Get the latest message (the prompt)
-      final prompt = messages.isNotEmpty ? messages.last.content : 'Analyze this image';
+    for (final apiVersion in apiVersions) {
+      for (final visionModel in visionModels) {
+        try {
+          debugPrint('🔄 [AI] Trying $visionModel with API $apiVersion...');
 
-      final body = jsonEncode({
-        'contents': [
-          {
-            'parts': [
+          final uri = Uri.parse(
+            'https://generativelanguage.googleapis.com/$apiVersion/models/$visionModel:generateContent?key=$_apiKey',
+          );
+
+          final request = await _httpClient.postUrl(uri);
+          request.headers.set('Content-Type', 'application/json');
+
+          final body = jsonEncode({
+            'contents': [
               {
-                'text': prompt,
-              },
-              {
-                'inline_data': {
-                  'mime_type': 'image/jpeg',
-                  'data': base64Image,
-                }
+                'parts': [
+                  {
+                    'text': prompt,
+                  },
+                  {
+                    'inline_data': {
+                      'mime_type': 'image/jpeg',
+                      'data': base64Image,
+                    }
+                  }
+                ]
               }
-            ]
+            ],
+            'generationConfig': {
+              'temperature': 0.4,
+              'topP': 0.8,
+              'maxOutputTokens': 500,
+            },
+          });
+
+          request.write(body);
+
+          final response = await request.close();
+          final responseBody = await response.transform(utf8.decoder).join();
+
+          debugPrint('📥 [AI] $visionModel/$apiVersion status: ${response.statusCode}');
+
+          if (response.statusCode == 200) {
+            final data = jsonDecode(responseBody) as Map<String, dynamic>;
+            final candidates = data['candidates'] as List<dynamic>?;
+
+            if (candidates != null && candidates.isNotEmpty) {
+              final content = candidates.first['content'];
+              final parts = content?['parts'] as List<dynamic>?;
+
+              if (parts != null && parts.isNotEmpty) {
+                final responseText = parts.first['text'] as String;
+                debugPrint('✅ [AI] Image analysis complete with $visionModel/$apiVersion');
+                return responseText;
+              }
+            }
           }
-        ],
-        'generationConfig': {
-          'temperature': 0.4,
-          'topP': 0.8,
-          'maxOutputTokens': 500,
-        },
-      });
 
-      request.write(body);
-
-      debugPrint('🔄 [AI] Sending image analysis request...');
-
-      final response = await request.close();
-      final responseBody = await response.transform(utf8.decoder).join();
-
-      debugPrint('📥 [AI] Image analysis response status: ${response.statusCode}');
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(responseBody) as Map<String, dynamic>;
-        final candidates = data['candidates'] as List<dynamic>?;
-
-        if (candidates != null && candidates.isNotEmpty) {
-          final content = candidates.first['content'];
-          final parts = content?['parts'] as List<dynamic>?;
-
-          if (parts != null && parts.isNotEmpty) {
-            final responseText = parts.first['text'] as String;
-            debugPrint('✅ [AI] Image analysis complete');
-            return responseText;
+          // Log error details for debugging
+          if (response.statusCode != 200) {
+            debugPrint('⚠️ [AI] $visionModel/$apiVersion failed: ${response.statusCode}');
+            // Try to get error message
+            try {
+              final errorData = jsonDecode(responseBody);
+              debugPrint('⚠️ [AI] Error: ${errorData['error']?['message'] ?? responseBody}');
+            } catch (_) {}
           }
+
+        } catch (e) {
+          debugPrint('❌ [AI] Exception with $visionModel/$apiVersion: $e');
         }
-
-        throw AIServiceException('Empty response from image analysis');
       }
-
-      // Retry on rate limit
-      if ((response.statusCode == 429 || response.statusCode == 503) && retryCount < 2) {
-        debugPrint('⚠️ [AI] Rate limited, retrying...');
-        await Future.delayed(Duration(seconds: (retryCount + 1) * 3));
-        return sendMessageWithImage(messages, base64Image, retryCount: retryCount + 1);
-      }
-
-      // Fallback on error
-      debugPrint('❌ [AI] Image analysis error: ${response.statusCode}');
-      return _getMockFoodAnalysisResponse();
-    } on SocketException {
-      debugPrint('❌ [AI] Network error during image analysis');
-      return _getMockFoodAnalysisResponse();
-    } catch (e) {
-      debugPrint('❌ [AI] Exception during image analysis: $e');
-      if (e is AIServiceException) rethrow;
-      return _getMockFoodAnalysisResponse();
     }
+
+    // All models failed, return mock
+    debugPrint('❌ [AI] All vision models failed, using fallback');
+    return _getMockFoodAnalysisResponse();
   }
+
 
   /// Mock food analysis response for fallback
   String _getMockFoodAnalysisResponse() {

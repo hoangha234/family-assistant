@@ -12,6 +12,16 @@
 .swiftpm/
 migrate_working_dir/
 
+# API Keys and Secrets - IMPORTANT: Never commit these!
+**/api_keys.dart
+**/secrets.dart
+**/config.local.dart
+*.env
+.env.*
+**/service-account*.json
+**/google-services.json
+**/GoogleService-Info.plist
+
 # IntelliJ related
 *.iml
 *.ipr

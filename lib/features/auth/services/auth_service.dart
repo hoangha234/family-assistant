@@ -208,6 +208,10 @@ class AuthService {
         return 'This sign-in method is not allowed';
       case 'invalid-credential':
         return 'Invalid email or password';
+      case 'network-request-failed':
+        return 'Network error. Please check your internet connection and try again';
+      case 'timeout':
+        return 'Connection timeout. Please try again';
       default:
         return 'Authentication failed. Please try again';
     }
