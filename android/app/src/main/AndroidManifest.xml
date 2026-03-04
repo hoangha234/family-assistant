@@ -1,4 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Step tracking permission -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION"/>
+    <!-- Camera permission for food scanning -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+
     <application
         android:label="family_assistant"
         android:name="${applicationName}"

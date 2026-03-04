@@ -1,6 +1,10 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
+import 'package:image/image.dart' as img;
 import '../models/meal_model.dart';
 import '../../ai_assistant/services/ai_service.dart';
 import '../../ai_assistant/models/ai_response_model.dart';
@@ -13,6 +17,56 @@ class MealServiceException implements Exception {
 
   @override
   String toString() => 'MealServiceException: $message';
+}
+
+/// Model for meal plan document in Firestore
+class MealPlanDocument {
+  final String date;
+  final int totalCalories;
+  final Map<String, MealModel?> meals;
+  final DateTime createdAt;
+
+  MealPlanDocument({
+    required this.date,
+    required this.totalCalories,
+    required this.meals,
+    required this.createdAt,
+  });
+
+  factory MealPlanDocument.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>? ?? {};
+    final mealsData = data['meals'] as Map<String, dynamic>? ?? {};
+
+    final meals = <String, MealModel?>{};
+    for (final type in ['breakfast', 'lunch', 'dinner']) {
+      if (mealsData[type] != null) {
+        meals[type] = MealModel.fromJson(mealsData[type] as Map<String, dynamic>);
+      }
+    }
+
+    return MealPlanDocument(
+      date: data['date'] as String? ?? doc.id,
+      totalCalories: (data['totalCalories'] as num?)?.toInt() ?? 0,
+      meals: meals,
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    final mealsMap = <String, dynamic>{};
+    meals.forEach((key, value) {
+      if (value != null) {
+        mealsMap[key] = value.toJson();
+      }
+    });
+
+    return {
+      'date': date,
+      'totalCalories': totalCalories,
+      'meals': mealsMap,
+      'createdAt': Timestamp.fromDate(createdAt),
+    };
+  }
 }
 
 /// Service for meal planning operations
@@ -304,16 +358,449 @@ IMPORTANT:
     }
   }
 
-  /// Get meals for a specific date (placeholder - can be extended with Firestore)
-  Future<List<MealModel>> getMealsForDate(DateTime date) async {
-    // TODO: Implement Firestore fetching
-    return [];
+  // ===================== FIRESTORE OPERATIONS =====================
+
+  /// Get current user ID
+  String? get _userId => FirebaseAuth.instance.currentUser?.uid;
+
+  /// Get Firestore collection reference for meal plans
+  CollectionReference<Map<String, dynamic>> get _mealPlansCollection {
+    final uid = _userId;
+    if (uid == null) {
+      throw MealServiceException('User not authenticated');
+    }
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('meal_plans');
   }
 
-  /// Save meal to storage (placeholder - can be extended with Firestore)
+  /// Format date to string (yyyy-MM-dd)
+  String _formatDate(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
+  /// Get meals for a specific date from Firestore
+  Future<List<MealModel>> getMealsForDate(DateTime date) async {
+    try {
+      final dateString = _formatDate(date);
+      debugPrint('[MealService] Fetching meals for date: $dateString');
+
+      final doc = await _mealPlansCollection.doc(dateString).get();
+
+      if (!doc.exists) {
+        debugPrint('[MealService] No meal plan found for $dateString');
+        return [];
+      }
+
+      // Check for corrupted data (imageBase64 too large)
+      final data = doc.data();
+      if (data != null && _hasCorruptedImageData(data)) {
+        debugPrint('[MealService] Found corrupted imageBase64 data, cleaning up...');
+        await _cleanupCorruptedData(dateString, data);
+        // Re-fetch after cleanup
+        final cleanDoc = await _mealPlansCollection.doc(dateString).get();
+        if (!cleanDoc.exists) return [];
+        final cleanPlan = MealPlanDocument.fromFirestore(cleanDoc);
+        return _extractMeals(cleanPlan);
+      }
+
+      final mealPlan = MealPlanDocument.fromFirestore(doc);
+      return _extractMeals(mealPlan);
+    } catch (e) {
+      debugPrint('[MealService] Error fetching meals: $e');
+      // If error is due to blob too big, try to clean up
+      if (e.toString().contains('Blob') || e.toString().contains('CursorWindow')) {
+        debugPrint('[MealService] Detected blob size error, attempting cleanup...');
+        try {
+          await _cleanupAllCorruptedData();
+        } catch (_) {}
+      }
+      if (e is MealServiceException) rethrow;
+      throw MealServiceException('Failed to fetch meals: $e');
+    }
+  }
+
+  /// Extract meals from MealPlanDocument
+  List<MealModel> _extractMeals(MealPlanDocument mealPlan) {
+    final meals = <MealModel>[];
+    mealPlan.meals.forEach((type, meal) {
+      if (meal != null) {
+        meals.add(meal);
+      }
+    });
+    meals.sort((a, b) => a.type.index.compareTo(b.type.index));
+    debugPrint('[MealService] Found ${meals.length} meals');
+    return meals;
+  }
+
+  /// Check if data contains corrupted imageBase64 (too large)
+  bool _hasCorruptedImageData(Map<String, dynamic> data) {
+    final meals = data['meals'] as Map<String, dynamic>?;
+    if (meals == null) return false;
+
+    for (final mealData in meals.values) {
+      if (mealData is Map<String, dynamic>) {
+        // Only flag OLD uncompressed imageBase64 (not the new compressed one)
+        // Old corrupted data uses 'imageBase64', new compressed uses 'imageBase64Compressed'
+        final imageBase64 = mealData['imageBase64'] as String?;
+        if (imageBase64 != null && imageBase64.length > 500000) {
+          return true; // Has very large uncompressed base64 image data
+        }
+      }
+    }
+    return false;
+  }
+
+  /// Clean up corrupted imageBase64 data from a document (only old uncompressed)
+  Future<void> _cleanupCorruptedData(String dateString, Map<String, dynamic> data) async {
+    try {
+      final meals = Map<String, dynamic>.from(data['meals'] ?? {});
+      bool needsUpdate = false;
+
+      for (final key in meals.keys) {
+        final mealData = meals[key];
+        // Only remove old uncompressed 'imageBase64', keep 'imageBase64Compressed'
+        if (mealData is Map<String, dynamic> && mealData.containsKey('imageBase64')) {
+          final cleanMeal = Map<String, dynamic>.from(mealData);
+          cleanMeal.remove('imageBase64');
+          meals[key] = cleanMeal;
+          needsUpdate = true;
+        }
+      }
+
+      if (needsUpdate) {
+        await _mealPlansCollection.doc(dateString).update({'meals': meals});
+        debugPrint('[MealService] Cleaned up imageBase64 from $dateString');
+      }
+    } catch (e) {
+      debugPrint('[MealService] Error cleaning up: $e');
+    }
+  }
+
+  /// Clean up all corrupted data in meal_plans collection
+  Future<void> _cleanupAllCorruptedData() async {
+    try {
+      debugPrint('[MealService] Cleaning up all corrupted meal data...');
+      final snapshot = await _mealPlansCollection.limit(50).get();
+
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        if (_hasCorruptedImageData(data)) {
+          await _cleanupCorruptedData(doc.id, data);
+        }
+      }
+      debugPrint('[MealService] Cleanup complete');
+    } catch (e) {
+      debugPrint('[MealService] Error during cleanup: $e');
+    }
+  }
+
+  /// Save meal to Firestore for a specific date
+  /// If meal has imageBytes, uploads to Firebase Storage first
+  Future<void> saveMealToDate(MealModel meal, DateTime date) async {
+    try {
+      final dateString = _formatDate(date);
+      debugPrint('[MealService] Saving meal "${meal.name}" to date: $dateString');
+
+      // If meal has AI-generated image bytes, try to upload to Firebase Storage
+      MealModel mealToSave = meal;
+      String? compressedBase64;
+
+      if (meal.imageBytes != null && meal.imageBytes!.isNotEmpty) {
+        debugPrint('[MealService] Processing AI image (${meal.imageBytes!.length} bytes)...');
+
+        // First, try Firebase Storage
+        debugPrint('[MealService] Attempting Firebase Storage upload...');
+        final imageUrl = await _uploadImageToStorage(
+          meal.imageBytes!,
+          dateString,
+          meal.type.name,
+          meal.id,
+        );
+
+        if (imageUrl != null) {
+          debugPrint('[MealService] Storage upload successful: $imageUrl');
+          mealToSave = meal.copyWith(imageUrl: imageUrl);
+        } else {
+          // Storage failed - compress and save as base64
+          debugPrint('[MealService] Storage failed, compressing image for base64...');
+          compressedBase64 = await _compressImageToBase64(meal.imageBytes!);
+          if (compressedBase64 != null) {
+            debugPrint('[MealService] Compressed to ${compressedBase64.length} chars');
+          }
+        }
+      }
+
+      final docRef = _mealPlansCollection.doc(dateString);
+      final existingDoc = await docRef.get();
+
+      Map<String, dynamic> mealsMap = {};
+      int totalCalories = 0;
+
+      if (existingDoc.exists) {
+        final data = existingDoc.data()!;
+        mealsMap = Map<String, dynamic>.from(data['meals'] ?? {});
+      }
+
+      // Convert meal to JSON
+      final mealJson = mealToSave.toJson();
+
+      // Add compressed base64 if Storage failed
+      if (compressedBase64 != null) {
+        mealJson['imageBase64Compressed'] = compressedBase64;
+      }
+
+      mealsMap[mealToSave.type.name] = mealJson;
+
+      // Calculate total calories
+      for (final type in ['breakfast', 'lunch', 'dinner']) {
+        if (mealsMap[type] != null) {
+          final mealData = mealsMap[type] as Map<String, dynamic>;
+          totalCalories += (mealData['calories'] as num?)?.toInt() ?? 0;
+        }
+      }
+
+      // Save to Firestore
+      await docRef.set({
+        'date': dateString,
+        'totalCalories': totalCalories,
+        'meals': mealsMap,
+        'createdAt': existingDoc.exists
+            ? existingDoc.data()!['createdAt']
+            : FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      debugPrint('[MealService] Meal saved successfully');
+    } catch (e) {
+      debugPrint('[MealService] Error saving meal: $e');
+      if (e is MealServiceException) rethrow;
+      throw MealServiceException('Failed to save meal: $e');
+    }
+  }
+
+  /// Compress image to small base64 string (< 500KB)
+  Future<String?> _compressImageToBase64(Uint8List imageBytes) async {
+    try {
+      // Decode image
+      final image = img.decodeImage(imageBytes);
+      if (image == null) return null;
+
+      // Resize to max 400px width/height to reduce size significantly
+      final resized = img.copyResize(
+        image,
+        width: image.width > image.height ? 400 : null,
+        height: image.height >= image.width ? 400 : null,
+        interpolation: img.Interpolation.linear,
+      );
+
+      // Encode as JPEG with quality 60 (good balance of size vs quality)
+      final compressed = img.encodeJpg(resized, quality: 60);
+
+      debugPrint('[MealService] Image compressed: ${imageBytes.length} -> ${compressed.length} bytes');
+
+      // Convert to base64
+      final base64 = base64Encode(compressed);
+
+      // Check if still too large (> 500KB base64 = ~375KB binary)
+      if (base64.length > 500000) {
+        debugPrint('[MealService] Still too large, compressing more...');
+        // Try even smaller
+        final smallerResized = img.copyResize(resized, width: 300);
+        final smallerCompressed = img.encodeJpg(smallerResized, quality: 50);
+        return base64Encode(smallerCompressed);
+      }
+
+      return base64;
+    } catch (e) {
+      debugPrint('[MealService] Error compressing image: $e');
+      return null;
+    }
+  }
+
+  /// Upload image bytes to Firebase Storage and return download URL
+  Future<String?> _uploadImageToStorage(
+    Uint8List imageBytes,
+    String dateString,
+    String mealType,
+    String mealId,
+  ) async {
+    try {
+      final uid = _userId;
+      if (uid == null) return null;
+
+      // Create unique path: users/{uid}/meal_images/{date}/{mealType}_{mealId}.jpg
+      final fileName = '${mealType}_$mealId.jpg';
+      final storagePath = 'users/$uid/meal_images/$dateString/$fileName';
+
+      debugPrint('[MealService] Uploading to: $storagePath');
+
+      final ref = FirebaseStorage.instance.ref().child(storagePath);
+
+      // Upload with metadata
+      final metadata = SettableMetadata(
+        contentType: 'image/jpeg',
+        customMetadata: {
+          'mealType': mealType,
+          'date': dateString,
+          'uploadedAt': DateTime.now().toIso8601String(),
+        },
+      );
+
+      final uploadTask = await ref.putData(imageBytes, metadata);
+
+      if (uploadTask.state == TaskState.success) {
+        final downloadUrl = await ref.getDownloadURL();
+        debugPrint('[MealService] Upload successful: $downloadUrl');
+        return downloadUrl;
+      }
+
+      return null;
+    } catch (e) {
+      debugPrint('[MealService] Error uploading image: $e');
+      // Don't fail the whole save operation if image upload fails
+      // Just use the placeholder URL
+      return null;
+    }
+  }
+
+  /// Save meal to storage (legacy method - uses current date)
   Future<void> saveMeal(MealModel meal) async {
-    // TODO: Implement Firestore saving
-    debugPrint('[MealService] Saving meal: ${meal.name}');
+    await saveMealToDate(meal, DateTime.now());
+  }
+
+  /// Delete a meal from a specific date
+  Future<void> deleteMealFromDate(MealType mealType, DateTime date) async {
+    try {
+      final dateString = _formatDate(date);
+      debugPrint('[MealService] Deleting ${mealType.name} from date: $dateString');
+
+      final docRef = _mealPlansCollection.doc(dateString);
+      final existingDoc = await docRef.get();
+
+      if (!existingDoc.exists) {
+        return;
+      }
+
+      final data = existingDoc.data()!;
+      final mealsMap = Map<String, dynamic>.from(data['meals'] ?? {});
+
+      // Remove the specific meal type
+      mealsMap.remove(mealType.name);
+
+      // Recalculate total calories
+      int totalCalories = 0;
+      for (final type in ['breakfast', 'lunch', 'dinner']) {
+        if (mealsMap[type] != null) {
+          final mealData = mealsMap[type] as Map<String, dynamic>;
+          totalCalories += (mealData['calories'] as num?)?.toInt() ?? 0;
+        }
+      }
+
+      // Update or delete document
+      if (mealsMap.isEmpty) {
+        await docRef.delete();
+      } else {
+        await docRef.update({
+          'totalCalories': totalCalories,
+          'meals': mealsMap,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      debugPrint('[MealService] Meal deleted successfully');
+    } catch (e) {
+      debugPrint('[MealService] Error deleting meal: $e');
+      if (e is MealServiceException) rethrow;
+      throw MealServiceException('Failed to delete meal: $e');
+    }
+  }
+
+  /// Get meal history (last N days with data)
+  Future<List<MealPlanDocument>> getMealHistory({int limit = 10}) async {
+    try {
+      debugPrint('[MealService] Fetching meal history (limit: $limit)');
+
+      final querySnapshot = await _mealPlansCollection
+          .orderBy('date', descending: true)
+          .limit(limit)
+          .get();
+
+      final history = <MealPlanDocument>[];
+
+      for (final doc in querySnapshot.docs) {
+        try {
+          // Check for corrupted data first
+          final data = doc.data();
+          if (_hasCorruptedImageData(data)) {
+            debugPrint('[MealService] Found corrupted data in ${doc.id}, cleaning...');
+            await _cleanupCorruptedData(doc.id, data);
+          }
+          history.add(MealPlanDocument.fromFirestore(doc));
+        } catch (e) {
+          debugPrint('[MealService] Error parsing doc ${doc.id}: $e');
+          // Skip corrupted documents
+        }
+      }
+
+      debugPrint('[MealService] Found ${history.length} days with meal data');
+      return history;
+    } catch (e) {
+      debugPrint('[MealService] Error fetching meal history: $e');
+      // If error is due to blob too big, try cleanup
+      if (e.toString().contains('Blob') || e.toString().contains('CursorWindow')) {
+        debugPrint('[MealService] Blob error detected, attempting cleanup...');
+        try {
+          await _cleanupAllCorruptedData();
+          // Return empty list after cleanup - user can retry
+          return [];
+        } catch (_) {}
+      }
+      if (e is MealServiceException) rethrow;
+      throw MealServiceException('Failed to fetch meal history: $e');
+    }
+  }
+
+  /// Check if a date has meal data
+  Future<bool> hasDataForDate(DateTime date) async {
+    try {
+      final dateString = _formatDate(date);
+      final doc = await _mealPlansCollection.doc(dateString).get();
+      return doc.exists;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Get dates with meal data for a specific month
+  Future<Set<int>> getDatesWithDataForMonth(DateTime month) async {
+    try {
+      final startDate = DateTime(month.year, month.month, 1);
+      final endDate = DateTime(month.year, month.month + 1, 0);
+
+      final startString = _formatDate(startDate);
+      final endString = _formatDate(endDate);
+
+      final querySnapshot = await _mealPlansCollection
+          .where('date', isGreaterThanOrEqualTo: startString)
+          .where('date', isLessThanOrEqualTo: endString)
+          .get();
+
+      final datesWithData = <int>{};
+      for (final doc in querySnapshot.docs) {
+        final dateString = doc.id;
+        final day = int.tryParse(dateString.split('-').last);
+        if (day != null) {
+          datesWithData.add(day);
+        }
+      }
+
+      return datesWithData;
+    } catch (e) {
+      debugPrint('[MealService] Error fetching dates with data: $e');
+      return {};
+    }
   }
 
   /// Dispose resources

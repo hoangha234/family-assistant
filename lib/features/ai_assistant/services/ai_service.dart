@@ -561,7 +561,149 @@ You are allowed to be conversational and informal when appropriate.
     _useFallback = false;
   }
 
-  void dispose() {
+  /// Send a message with an image attachment for analysis (food scanning, etc.)
+  Future<String> sendMessageWithImage(
+    List<MessageModel> messages,
+    String base64Image, {
+    int retryCount = 0,
+  }) async {
+    if (_useFallback) {
+      debugPrint('⚠️ [AI] Using fallback mode for image analysis');
+      return _getMockFoodAnalysisResponse();
+    }
+
+    // Rate limiting
+    if (_lastRequestTime != null) {
+      final elapsed = DateTime.now().difference(_lastRequestTime!);
+      if (elapsed < _minRequestInterval) {
+        await Future.delayed(_minRequestInterval - elapsed);
+      }
+    }
+    _lastRequestTime = DateTime.now();
+
+    try {
+      // Use vision-capable model for image analysis
+      const visionModel = 'gemini-1.5-flash';
+
+      final uri = Uri.parse(
+        'https://generativelanguage.googleapis.com/$_currentApiVersion/models/$visionModel:generateContent?key=$_apiKey',
+      );
+
+      final request = await _httpClient.postUrl(uri);
+      request.headers.set('Content-Type', 'application/json');
+
+      // Get the latest message (the prompt)
+      final prompt = messages.isNotEmpty ? messages.last.content : 'Analyze this image';
+
+      final body = jsonEncode({
+        'contents': [
+          {
+            'parts': [
+              {
+                'text': prompt,
+              },
+              {
+                'inline_data': {
+                  'mime_type': 'image/jpeg',
+                  'data': base64Image,
+                }
+              }
+            ]
+          }
+        ],
+        'generationConfig': {
+          'temperature': 0.4,
+          'topP': 0.8,
+          'maxOutputTokens': 500,
+        },
+      });
+
+      request.write(body);
+
+      debugPrint('🔄 [AI] Sending image analysis request...');
+
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
+
+      debugPrint('📥 [AI] Image analysis response status: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(responseBody) as Map<String, dynamic>;
+        final candidates = data['candidates'] as List<dynamic>?;
+
+        if (candidates != null && candidates.isNotEmpty) {
+          final content = candidates.first['content'];
+          final parts = content?['parts'] as List<dynamic>?;
+
+          if (parts != null && parts.isNotEmpty) {
+            final responseText = parts.first['text'] as String;
+            debugPrint('✅ [AI] Image analysis complete');
+            return responseText;
+          }
+        }
+
+        throw AIServiceException('Empty response from image analysis');
+      }
+
+      // Retry on rate limit
+      if ((response.statusCode == 429 || response.statusCode == 503) && retryCount < 2) {
+        debugPrint('⚠️ [AI] Rate limited, retrying...');
+        await Future.delayed(Duration(seconds: (retryCount + 1) * 3));
+        return sendMessageWithImage(messages, base64Image, retryCount: retryCount + 1);
+      }
+
+      // Fallback on error
+      debugPrint('❌ [AI] Image analysis error: ${response.statusCode}');
+      return _getMockFoodAnalysisResponse();
+    } on SocketException {
+      debugPrint('❌ [AI] Network error during image analysis');
+      return _getMockFoodAnalysisResponse();
+    } catch (e) {
+      debugPrint('❌ [AI] Exception during image analysis: $e');
+      if (e is AIServiceException) rethrow;
+      return _getMockFoodAnalysisResponse();
+    }
+  }
+
+  /// Mock food analysis response for fallback
+  String _getMockFoodAnalysisResponse() {
+    return '''
+{
+  "food_name": "Mixed Meal",
+  "calories": 450,
+  "protein": 25,
+  "carbs": 45,
+  "fat": 18
+}
+''';
+  }
+
+  /// Analyze an image (for food scanning) and return structured JSON
+  Future<String> analyzeImage(String base64Image) async {
+    const prompt = '''Analyze this food image and estimate the nutritional information.
+Return ONLY a valid JSON object with no additional text or markdown:
+{
+  "food_name": "name of the food",
+  "calories": estimated calories as integer,
+  "protein": protein in grams as integer,
+  "carbs": carbohydrates in grams as integer,
+  "fat": fat in grams as integer
+}
+
+Be realistic with your estimates based on typical serving sizes.
+If you cannot identify the food, make your best guess based on what you see.''';
+
+    final messages = [
+      MessageModel(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        content: prompt,
+        role: MessageRole.user,
+        timestamp: DateTime.now(),
+      ),
+    ];
+
+    return sendMessageWithImage(messages, base64Image);
+  }  void dispose() {
     _httpClient.close();
   }
 }

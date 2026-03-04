@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -184,6 +185,7 @@ class MealModel {
   /// Convert to Map for Firestore
   Map<String, dynamic> toMap() {
     return {
+      'id': id,
       'name': name,
       'description': description,
       'type': type.name,
@@ -198,6 +200,73 @@ class MealModel {
       'date': Timestamp.fromDate(date),
       'createdAt': Timestamp.fromDate(createdAt),
     };
+  }
+
+  /// Convert to JSON (for nested storage in meal_plans collection)
+  /// Note: imageBytes is NOT stored here - it should be uploaded to Firebase Storage
+  /// and the resulting URL should be set as imageUrl before calling toJson()
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'description': description,
+      'type': type.name,
+      'calories': calories,
+      'protein': protein,
+      'carbs': carbs,
+      'fats': fats,
+      'ingredients': ingredients,
+      'instructions': instructions,
+      'imageUrl': imageUrl,
+      'imagePrompt': imagePrompt,
+      // DO NOT store imageBase64 - it causes SQLiteBlobTooBigException
+      // Images should be uploaded to Firebase Storage instead
+      'date': date.toIso8601String(),
+      'createdAt': createdAt.toIso8601String(),
+    };
+  }
+
+  /// Create from JSON (for nested retrieval from meal_plans collection)
+  factory MealModel.fromJson(Map<String, dynamic> json) {
+    // Try to decode compressed base64 image if available
+    Uint8List? decodedImageBytes;
+    final compressedBase64 = json['imageBase64Compressed'] as String?;
+    if (compressedBase64 != null && compressedBase64.isNotEmpty) {
+      try {
+        decodedImageBytes = base64Decode(compressedBase64);
+      } catch (e) {
+        // Failed to decode, leave as null
+      }
+    }
+
+    return MealModel(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      type: MealType.fromString(json['type'] as String? ?? 'lunch'),
+      calories: (json['calories'] as num?)?.toInt() ?? 0,
+      protein: (json['protein'] as num?)?.toInt() ?? 0,
+      carbs: (json['carbs'] as num?)?.toInt() ?? 0,
+      fats: (json['fats'] as num?)?.toInt() ?? 0,
+      ingredients: (json['ingredients'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [],
+      instructions: (json['instructions'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [],
+      imageUrl: json['imageUrl'] as String? ?? '',
+      imagePrompt: json['imagePrompt'] as String?,
+      // Load from compressed base64 if available
+      imageBytes: decodedImageBytes,
+      date: json['date'] != null
+          ? DateTime.tryParse(json['date'] as String) ?? DateTime.now()
+          : DateTime.now(),
+      createdAt: json['createdAt'] != null
+          ? DateTime.tryParse(json['createdAt'] as String) ?? DateTime.now()
+          : DateTime.now(),
+    );
   }
 
   /// Copy with updated values

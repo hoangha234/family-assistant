@@ -6,6 +6,7 @@ import 'dart:math' as math;
 import '../cubit/meal_plan_cubit.dart';
 import '../models/meal_model.dart';
 import 'meal_detail_screen.dart';
+import 'meal_history_screen.dart';
 
 class MealPlanScreen extends StatelessWidget {
   const MealPlanScreen({super.key});
@@ -64,7 +65,7 @@ class MealPlanView extends StatelessWidget {
                         child: Column(
                           children: [
                             _buildNutritionSummary(state, cardColor, textColor, isDarkMode, primaryColor),
-                            _buildSectionHeader("Today's Meals", textColor, primaryColor),
+                            _buildSectionHeader(context, "Today's Meals", textColor, primaryColor),
                             Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 16),
                               child: Column(
@@ -177,84 +178,199 @@ class MealPlanView extends StatelessWidget {
               color: textColor,
             ),
           ),
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
+          GestureDetector(
+            onTap: () => _showMonthPicker(context),
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.calendar_today, color: textColor, size: 24),
             ),
-            child: Icon(Icons.calendar_today, color: textColor, size: 24),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildDateStrip(BuildContext context, MealPlanState state, bool isDarkMode) {
-    final days = [
-      {"day": "MON", "date": "12"},
-      {"day": "TUE", "date": "13"},
-      {"day": "WED", "date": "14"},
-      {"day": "THU", "date": "15"},
-      {"day": "FRI", "date": "16"},
-      {"day": "SAT", "date": "17"},
-    ];
+  /// Show month picker dialog
+  void _showMonthPicker(BuildContext context) {
+    final cubit = context.read<MealPlanCubit>();
+    final currentMonth = cubit.state.currentMonth;
+    final currentYear = DateTime.now().year;
 
-    return SizedBox(
-      height: 80,
-      child: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        scrollDirection: Axis.horizontal,
-        itemCount: days.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final isSelected = index == state.selectedDayIndex;
-          return GestureDetector(
-            onTap: () => context.read<MealPlanCubit>().setDay(index),
-            child: Container(
-              width: 48,
-              margin: const EdgeInsets.symmetric(vertical: 8),
-              decoration: BoxDecoration(
-                color: isSelected 
-                    ? primaryColor 
-                    : (isDarkMode ? Colors.grey[800] : Colors.white),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withAlpha(13),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  )
-                ],
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    days[index]["day"]!,
-                    style: GoogleFonts.manrope(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: isSelected ? textDark : (isDarkMode ? Colors.white70 : Colors.black54),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    days[index]["date"]!,
-                    style: GoogleFonts.manrope(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: isSelected ? textDark : (isDarkMode ? Colors.white : textDark),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (bottomContext) {
+        return BlocProvider.value(
+          value: cubit,
+          child: _MonthPickerSheet(
+            currentMonth: currentMonth,
+            currentYear: currentYear,
+            primaryColor: primaryColor,
+          ),
+        );
+      },
     );
   }
+
+  /// Build date strip with full calendar
+  Widget _buildDateStrip(BuildContext context, MealPlanState state, bool isDarkMode) {
+    final months = ['January', 'February', 'March', 'April', 'May', 'June',
+                    'July', 'August', 'September', 'October', 'November', 'December'];
+    final monthName = months[state.currentMonth.month - 1];
+    final year = state.currentMonth.year;
+
+    return Column(
+      children: [
+        // Month header with navigation
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              GestureDetector(
+                onTap: () => context.read<MealPlanCubit>().previousMonth(),
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: isDarkMode ? Colors.grey[800] : Colors.grey[100],
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.chevron_left,
+                    color: isDarkMode ? Colors.white70 : Colors.grey[700],
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onTap: () => context.read<MealPlanCubit>().goToToday(),
+                child: Column(
+                  children: [
+                    Text(
+                      '$monthName $year',
+                      style: GoogleFonts.manrope(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: isDarkMode ? Colors.white : textDark,
+                      ),
+                    ),
+                    if (!state.isToday(state.selectedDate))
+                      Text(
+                        'Tap to go to today',
+                        style: GoogleFonts.manrope(
+                          fontSize: 10,
+                          color: primaryColor,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              GestureDetector(
+                onTap: () => context.read<MealPlanCubit>().nextMonth(),
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: isDarkMode ? Colors.grey[800] : Colors.grey[100],
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.chevron_right,
+                    color: isDarkMode ? Colors.white70 : Colors.grey[700],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Days list - horizontal scroll
+        SizedBox(
+          height: 80,
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            scrollDirection: Axis.horizontal,
+            itemCount: state.daysInCurrentMonth,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (context, index) {
+              final day = index + 1;
+              final date = DateTime(state.currentMonth.year, state.currentMonth.month, day);
+              final isSelected = state.isSelected(date);
+              final isToday = state.isToday(date);
+
+              // Get weekday name
+              final weekdays = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+              final weekday = weekdays[date.weekday - 1];
+
+              return GestureDetector(
+                onTap: () => context.read<MealPlanCubit>().selectDate(date),
+                child: Container(
+                  width: 48,
+                  margin: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? primaryColor
+                        : (isDarkMode ? Colors.grey[800] : Colors.white),
+                    borderRadius: BorderRadius.circular(12),
+                    border: isToday && !isSelected
+                        ? Border.all(color: primaryColor, width: 2)
+                        : null,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withAlpha(13),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      )
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        weekday,
+                        style: GoogleFonts.manrope(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: isSelected
+                              ? textDark
+                              : (isDarkMode ? Colors.white70 : Colors.black54),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '$day',
+                        style: GoogleFonts.manrope(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: isSelected
+                              ? textDark
+                              : (isDarkMode ? Colors.white : textDark),
+                        ),
+                      ),
+                      if (isToday && !isSelected)
+                        Container(
+                          width: 4,
+                          height: 4,
+                          margin: const EdgeInsets.only(top: 2),
+                          decoration: BoxDecoration(
+                            color: primaryColor,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
 
   Widget _buildNutritionSummary(MealPlanState state, Color cardColor, Color textColor, bool isDarkMode, Color primaryColor) {
     final totalCalories = state.totalCalories;
@@ -356,7 +472,7 @@ class MealPlanView extends StatelessWidget {
     );
   }
 
-  Widget _buildSectionHeader(String title, Color textColor, Color primaryColor) {
+  Widget _buildSectionHeader(BuildContext context, String title, Color textColor, Color primaryColor) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
@@ -370,12 +486,25 @@ class MealPlanView extends StatelessWidget {
               color: textColor,
             ),
           ),
-          Text(
-            "View History",
-            style: GoogleFonts.manrope(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: primaryColor,
+          GestureDetector(
+            onTap: () async {
+              final selectedDate = await Navigator.push<DateTime>(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const MealHistoryScreen(),
+                ),
+              );
+              if (selectedDate != null && context.mounted) {
+                context.read<MealPlanCubit>().selectDate(selectedDate);
+              }
+            },
+            child: Text(
+              "View History",
+              style: GoogleFonts.manrope(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: primaryColor,
+              ),
             ),
           ),
         ],
@@ -1222,3 +1351,143 @@ class DashedRectPainter extends CustomPainter {
     return true;
   }
 }
+
+/// Month Picker Bottom Sheet
+class _MonthPickerSheet extends StatelessWidget {
+  final DateTime currentMonth;
+  final int currentYear;
+  final Color primaryColor;
+
+  const _MonthPickerSheet({
+    required this.currentMonth,
+    required this.currentYear,
+    required this.primaryColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final backgroundColor = isDarkMode ? const Color(0xFF1A2E24) : Colors.white;
+    final textColor = isDarkMode ? Colors.white : const Color(0xFF111814);
+
+    final months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+
+    return Container(
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle bar
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[400],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          // Title
+          Text(
+            'Select Month',
+            style: GoogleFonts.manrope(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: textColor,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '$currentYear',
+            style: GoogleFonts.manrope(
+              fontSize: 14,
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 24),
+          // Month grid
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              childAspectRatio: 2.5,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+            ),
+            itemCount: 12,
+            itemBuilder: (context, index) {
+              final isSelected = (index + 1) == currentMonth.month &&
+                                  currentMonth.year == currentYear;
+              final isCurrentMonth = (index + 1) == DateTime.now().month &&
+                                      currentYear == DateTime.now().year;
+
+              return GestureDetector(
+                onTap: () {
+                  final selectedMonth = DateTime(currentYear, index + 1);
+                  context.read<MealPlanCubit>().changeMonth(selectedMonth);
+                  Navigator.pop(context);
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? primaryColor
+                        : (isDarkMode ? Colors.grey[800] : Colors.grey[100]),
+                    borderRadius: BorderRadius.circular(12),
+                    border: isCurrentMonth && !isSelected
+                        ? Border.all(color: primaryColor, width: 2)
+                        : null,
+                  ),
+                  child: Center(
+                    child: Text(
+                      months[index].substring(0, 3),
+                      style: GoogleFonts.manrope(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: isSelected
+                            ? const Color(0xFF111814)
+                            : (isDarkMode ? Colors.white70 : Colors.grey[700]),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 24),
+          // Go to today button
+          SizedBox(
+            width: double.infinity,
+            child: TextButton(
+              onPressed: () {
+                context.read<MealPlanCubit>().goToToday();
+                Navigator.pop(context);
+              },
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              child: Text(
+                'Go to Today',
+                style: GoogleFonts.manrope(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: primaryColor,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+

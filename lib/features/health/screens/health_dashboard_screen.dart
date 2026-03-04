@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'dart:ui';
 import '../cubit/health_dashboard_cubit.dart';
+import '../models/food_analysis_model.dart';
 
 class HealthDashboardScreen extends StatelessWidget {
   const HealthDashboardScreen({super.key});
@@ -22,9 +22,8 @@ class HealthDashboardView extends StatelessWidget {
   final Color primaryColor = const Color(0xFF13EC80);
   final Color bgLight = const Color(0xFFF8F9FA);
   final Color bgDark = const Color(0xFF102219);
-  final Color heartRed = const Color(0xFFFF4D6D);
   final Color textDark = const Color(0xFF111814);
-  final Color textGreenMuted = const Color(0xFF618975);
+  final Color textMuted = const Color(0xFF6B7280);
 
   @override
   Widget build(BuildContext context) {
@@ -32,27 +31,57 @@ class HealthDashboardView extends StatelessWidget {
     final backgroundColor = isDarkMode ? bgDark : bgLight;
     final cardColor = isDarkMode ? const Color(0xFF1A2E24) : Colors.white;
     final textColor = isDarkMode ? Colors.white : textDark;
-    final borderColor = isDarkMode ? Colors.white.withOpacity(0.05) : const Color(0xFFE2E8F0);
 
-    return BlocBuilder<HealthDashboardCubit, HealthDashboardState>(
+    return BlocConsumer<HealthDashboardCubit, HealthDashboardState>(
+      listener: (context, state) {
+        // Show snackbar on scan success
+        if (state.status == HealthDashboardStatus.scanSuccess && state.lastScannedFood != null) {
+          _showScanResultSnackbar(context, state.lastScannedFood!);
+        }
+        // Show error snackbar
+        if (state.status == HealthDashboardStatus.scanError) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to analyze food: ${state.errorMessage ?? "Unknown error"}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      },
       builder: (context, state) {
         return Scaffold(
           backgroundColor: backgroundColor,
           body: Stack(
             children: [
               SingleChildScrollView(
-                padding: const EdgeInsets.only(bottom: 120),
+                padding: const EdgeInsets.only(bottom: 100),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildHeader(context, textColor, isDarkMode),
-                    _buildHeartRateCard(cardColor, textColor, borderColor, isDarkMode),
-                    _buildQuickStatsGrid(cardColor, textColor, borderColor, isDarkMode),
-                    _buildWeeklySummary(cardColor, textColor, borderColor, isDarkMode),
-                    _buildVitalsTrend(cardColor, textColor, borderColor, isDarkMode),
+                    _buildAppBar(context, textColor, isDarkMode),
+                    const SizedBox(height: 16),
+                    _buildStepsCard(context, state, cardColor, textColor, isDarkMode),
+                    const SizedBox(height: 16),
+                    _buildSleepWaterRow(state, cardColor, textColor, isDarkMode),
+                    const SizedBox(height: 24),
+                    _buildTodayHealthSummary(state, cardColor, textColor, isDarkMode),
+                    const SizedBox(height: 24),
+                    _buildWeeklyOverview(cardColor, textColor, isDarkMode),
                   ],
                 ),
               ),
-
+              // Floating Scan Button
+              Positioned(
+                bottom: 24,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: _buildFloatingScanButton(context, state),
+                ),
+              ),
+              // Loading overlay when scanning
+              if (state.status == HealthDashboardStatus.scanning)
+                _buildScanningOverlay(),
             ],
           ),
         );
@@ -60,31 +89,54 @@ class HealthDashboardView extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader(BuildContext context, Color textColor, bool isDarkMode) {
-    return Container(
-      padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top + 16,
-        left: 16,
-        right: 16,
-        bottom: 16,
+  /// Show snackbar with scan result
+  void _showScanResultSnackbar(BuildContext context, FoodAnalysis food) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '✅ ${food.foodName}',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            Text(
+              '${food.calories} cal • ${food.protein}g protein • ${food.carbs}g carbs • ${food.fat}g fat',
+              style: const TextStyle(fontSize: 12),
+            ),
+          ],
+        ),
+        backgroundColor: primaryColor,
+        duration: const Duration(seconds: 3),
       ),
-      color: isDarkMode ? bgDark.withOpacity(0.8) : bgLight.withOpacity(0.8),
-      child: ClipRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    );
+  }
+
+  /// Build scanning overlay
+  Widget _buildScanningOverlay() {
+    return Container(
+      color: Colors.black54,
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              _buildCircleBtn(Icons.arrow_back_ios_new, isDarkMode),
+              CircularProgressIndicator(color: primaryColor),
+              const SizedBox(height: 16),
               Text(
-                "Health Dashboard",
+                'Analyzing food...',
                 style: GoogleFonts.manrope(
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: textColor,
+                  color: textDark,
                 ),
               ),
-              _buildCircleBtn(Icons.calendar_today, isDarkMode),
             ],
           ),
         ),
@@ -92,190 +144,178 @@ class HealthDashboardView extends StatelessWidget {
     );
   }
 
-  Widget _buildCircleBtn(IconData icon, bool isDarkMode) {
+  Widget _buildAppBar(BuildContext context, Color textColor, bool isDarkMode) {
     return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: isDarkMode ? Colors.white.withOpacity(0.1) : Colors.white,
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          )
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + 12,
+        left: 16,
+        right: 16,
+        bottom: 12,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Icon(Icons.arrow_back, color: textColor, size: 24),
+          ),
+          Text(
+            "Health Dashboard",
+            style: GoogleFonts.manrope(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: textColor,
+            ),
+          ),
+          Icon(Icons.calendar_today_outlined, color: textColor, size: 22),
         ],
       ),
-      child: Icon(icon, size: 20, color: isDarkMode ? Colors.white : textDark),
     );
   }
 
-  Widget _buildHeartRateCard(Color cardColor, Color textColor, Color borderColor, bool isDarkMode) {
+  Widget _buildStepsCard(BuildContext context, HealthDashboardState state, Color cardColor, Color textColor, bool isDarkMode) {
+    final int currentSteps = state.steps;
+    final int goalSteps = state.stepGoal;
+    final double progress = state.stepProgress;
+    final int percentage = state.stepPercentage;
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: cardColor,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: borderColor),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4)
+            BoxShadow(
+              color: Colors.black.withAlpha(13),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
           ],
         ),
-        child: Column(
+        child: Row(
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("Heart Rate",
-                        style: GoogleFonts.manrope(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: isDarkMode ? primaryColor.withOpacity(0.7) : textGreenMuted)),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
-                      children: [
-                        Text("72",
-                            style: GoogleFonts.manrope(
-                                fontSize: 32,
-                                fontWeight: FontWeight.w800,
-                                color: textColor)),
-                        const SizedBox(width: 4),
-                        Text("BPM",
-                            style: GoogleFonts.manrope(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: isDarkMode ? primaryColor.withOpacity(0.7) : textGreenMuted)),
-                      ],
-                    )
-                  ],
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isDarkMode ? const Color(0xFF450a0a) : const Color(0xFFFFF0F3),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
+            // Left side - Steps info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      Icon(Icons.favorite, size: 14, color: heartRed),
-                      const SizedBox(width: 4),
-                      Text("LIVE",
-                          style: GoogleFonts.manrope(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: heartRed,
-                              letterSpacing: 1.0)),
+                      Icon(Icons.directions_walk, color: primaryColor, size: 18),
+                      const SizedBox(width: 6),
+                      Text(
+                        "Steps",
+                        style: GoogleFonts.manrope(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: primaryColor,
+                        ),
+                      ),
                     ],
                   ),
-                )
-              ],
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 100,
-              width: double.infinity,
-              child: CustomPaint(
-                painter: HeartRatePainter(color: heartRed),
+                  const SizedBox(height: 8),
+                  Text(
+                    currentSteps.toString().replaceAllMapped(
+                        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+                        (Match m) => '${m[1]},'),
+                    style: GoogleFonts.manrope(
+                      fontSize: 36,
+                      fontWeight: FontWeight.bold,
+                      color: textColor,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "Goal: ${goalSteps.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}",
+                    style: GoogleFonts.manrope(
+                      fontSize: 12,
+                      color: textMuted,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: ["12pm", "1pm", "2pm", "3pm", "4pm"]
-                  .map((e) => Text(e,
-                      style: GoogleFonts.manrope(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: isDarkMode ? Colors.white.withOpacity(0.4) : textGreenMuted)))
-                  .toList(),
-            )
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQuickStatsGrid(Color cardColor, Color textColor, Color borderColor, bool isDarkMode) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildStatCard(
-              cardColor,
-              borderColor,
-              customIcon: Stack(
+            // Right side - Circular progress
+            SizedBox(
+              width: 80,
+              height: 80,
+              child: Stack(
                 alignment: Alignment.center,
                 children: [
                   SizedBox(
-                    width: 60, height: 60,
+                    width: 80,
+                    height: 80,
                     child: CircularProgressIndicator(
                       value: 1.0,
-                      strokeWidth: 3,
-                      color: isDarkMode ? Colors.white.withOpacity(0.05) : const Color(0xFFF0F4F2),
+                      strokeWidth: 8,
+                      backgroundColor: isDarkMode
+                          ? Colors.white.withAlpha(26)
+                          : Colors.grey.shade200,
+                      color: Colors.transparent,
                     ),
                   ),
                   SizedBox(
-                    width: 60, height: 60,
+                    width: 80,
+                    height: 80,
                     child: CircularProgressIndicator(
-                      value: 0.75,
-                      strokeWidth: 3,
+                      value: progress,
+                      strokeWidth: 8,
+                      backgroundColor: Colors.transparent,
                       color: primaryColor,
                       strokeCap: StrokeCap.round,
                     ),
                   ),
-                  Icon(Icons.directions_walk, color: primaryColor, size: 24),
+                  Text(
+                    "$percentage%",
+                    style: GoogleFonts.manrope(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: textColor,
+                    ),
+                  ),
                 ],
               ),
-              value: "8,432",
-              label: "STEPS",
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSleepWaterRow(HealthDashboardState state, Color cardColor, Color textColor, bool isDarkMode) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          // Sleep Card
+          Expanded(
+            child: _buildMetricCard(
+              cardColor: cardColor,
               textColor: textColor,
-              labelColor: isDarkMode ? Colors.white.withOpacity(0.5) : textGreenMuted,
+              isDarkMode: isDarkMode,
+              icon: Icons.bedtime_outlined,
+              iconColor: Colors.indigo,
+              label: "Sleep",
+              value: state.sleepFormatted,
+              goal: "Goal: ${state.sleepGoal.toInt()}h",
+              progress: state.sleepProgress,
             ),
           ),
           const SizedBox(width: 12),
+          // Water Card
           Expanded(
-            child: _buildStatCard(
-              cardColor,
-              borderColor,
-              customIcon: Container(
-                width: 60, height: 60,
-                decoration: BoxDecoration(
-                  color: isDarkMode ? Colors.white.withOpacity(0.05) : const Color(0xFFF0F4F2),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.bedtime, color: Colors.indigo, size: 28),
-              ),
-              value: "7h 45m",
-              label: "SLEEP",
+            child: _buildMetricCard(
+              cardColor: cardColor,
               textColor: textColor,
-              labelColor: isDarkMode ? Colors.white.withOpacity(0.5) : textGreenMuted,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _buildStatCard(
-              cardColor,
-              borderColor,
-              customIcon: Container(
-                width: 60, height: 60,
-                decoration: BoxDecoration(
-                  color: isDarkMode ? Colors.white.withOpacity(0.05) : const Color(0xFFF0F4F2),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.water_drop, color: Colors.blue, size: 28),
-              ),
-              value: "1.2L",
-              label: "HYDRATION",
-              textColor: textColor,
-              labelColor: isDarkMode ? Colors.white.withOpacity(0.5) : textGreenMuted,
+              isDarkMode: isDarkMode,
+              icon: Icons.water_drop_outlined,
+              iconColor: Colors.lightBlue,
+              label: "Water",
+              value: state.waterFormatted,
+              goal: "Goal: ${state.waterGoal}L",
+              progress: state.waterProgress,
             ),
           ),
         ],
@@ -283,121 +323,196 @@ class HealthDashboardView extends StatelessWidget {
     );
   }
 
-  Widget _buildStatCard(Color bg, Color border, {
-    required Widget customIcon,
-    required String value,
-    required String label,
+  Widget _buildMetricCard({
+    required Color cardColor,
     required Color textColor,
-    required Color labelColor,
+    required bool isDarkMode,
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+    required String value,
+    required String goal,
+    required double progress,
   }) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: bg,
+        color: cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(13),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          customIcon,
+          Row(
+            children: [
+              Icon(icon, color: iconColor, size: 18),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: GoogleFonts.manrope(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: iconColor,
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 12),
-          Text(value, style: GoogleFonts.manrope(fontSize: 16, fontWeight: FontWeight.bold, color: textColor)),
-          Text(label, style: GoogleFonts.manrope(fontSize: 10, fontWeight: FontWeight.bold, color: labelColor)),
+          Text(
+            value,
+            style: GoogleFonts.manrope(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: textColor,
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Progress bar
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 6,
+              backgroundColor: isDarkMode
+                  ? Colors.white.withAlpha(26)
+                  : Colors.grey.shade200,
+              color: primaryColor,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            goal,
+            style: GoogleFonts.manrope(
+              fontSize: 11,
+              color: textMuted,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildWeeklySummary(Color cardColor, Color textColor, Color borderColor, bool isDarkMode) {
+  Widget _buildTodayHealthSummary(HealthDashboardState state, Color cardColor, Color textColor, bool isDarkMode) {
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("Weekly Health Summary", style: GoogleFonts.manrope(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
+          Text(
+            "Today's Health Summary",
+            style: GoogleFonts.manrope(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: textColor,
+            ),
+          ),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: cardColor,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: borderColor),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("Great progress!", style: GoogleFonts.manrope(fontSize: 16, fontWeight: FontWeight.bold, color: textColor)),
-                      const SizedBox(height: 4),
-                      Text(
-                        "You're 15% more active than last week! Great job keeping the family moving.",
-                        style: GoogleFonts.manrope(fontSize: 12, color: isDarkMode ? Colors.white.withOpacity(0.6) : textGreenMuted),
-                      ),
-                      const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: primaryColor,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text("View Full Report", style: GoogleFonts.manrope(fontSize: 12, fontWeight: FontWeight.bold, color: bgDark)),
-                            const SizedBox(width: 4),
-                            Icon(Icons.arrow_forward, size: 14, color: bgDark),
-                          ],
-                        ),
-                      )
-                    ],
-                  ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(13),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 ),
-                const SizedBox(width: 16),
-                Container(
-                  width: 120,
-                  height: 100,
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: isDarkMode ? bgDark.withOpacity(0.5) : bgLight,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      _buildBar(0.4),
-                      _buildBar(0.6),
-                      _buildBar(0.5),
-                      _buildBar(0.8),
-                      _buildBar(1.0),
-                    ],
-                  ),
-                )
               ],
             ),
-          )
+            child: Column(
+              children: [
+                _buildSummaryRow(
+                  label: "Calories",
+                  current: state.dailyCalories,
+                  goal: state.caloriesGoal,
+                  unit: "kcal",
+                  textColor: textColor,
+                  isDarkMode: isDarkMode,
+                ),
+                const SizedBox(height: 16),
+                _buildSummaryRow(
+                  label: "Protein",
+                  current: state.protein,
+                  goal: state.proteinGoal,
+                  unit: "g",
+                  textColor: textColor,
+                  isDarkMode: isDarkMode,
+                ),
+                const SizedBox(height: 16),
+                _buildSummaryRow(
+                  label: "Activity",
+                  current: state.activityMinutes,
+                  goal: state.activityGoal,
+                  unit: "min",
+                  textColor: textColor,
+                  isDarkMode: isDarkMode,
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildBar(double heightFactor) {
-    return FractionallySizedBox(
-      heightFactor: heightFactor,
-      child: Container(
-        width: 12,
-        decoration: BoxDecoration(
-          color: primaryColor.withOpacity(0.2 + (0.8 * heightFactor)),
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+  Widget _buildSummaryRow({
+    required String label,
+    required int current,
+    required int goal,
+    required String unit,
+    required Color textColor,
+    required bool isDarkMode,
+  }) {
+    final double progress = current / goal;
+
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              label,
+              style: GoogleFonts.manrope(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: textColor,
+              ),
+            ),
+            Text(
+              "$current / $goal $unit",
+              style: GoogleFonts.manrope(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: textColor,
+              ),
+            ),
+          ],
         ),
-      ),
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: progress.clamp(0.0, 1.0),
+            minHeight: 8,
+            backgroundColor: isDarkMode
+                ? Colors.white.withAlpha(26)
+                : Colors.grey.shade200,
+            color: primaryColor,
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildVitalsTrend(Color cardColor, Color textColor, Color borderColor, bool isDarkMode) {
+  Widget _buildWeeklyOverview(Color cardColor, Color textColor, bool isDarkMode) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -405,123 +520,260 @@ class HealthDashboardView extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text("Vitals Trend", style: GoogleFonts.manrope(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
-              Text("Monthly View", style: GoogleFonts.manrope(fontSize: 12, fontWeight: FontWeight.bold, color: primaryColor)),
+              Text(
+                "Weekly Overview",
+                style: GoogleFonts.manrope(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: textColor,
+                ),
+              ),
+              Text(
+                "Full Report",
+                style: GoogleFonts.manrope(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: primaryColor,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
           Container(
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: cardColor,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: borderColor),
-            ),
-            child: Column(
-              children: [
-                _buildTrendItem(
-                  icon: Icons.monitor_weight_outlined,
-                  iconColor: Colors.orange,
-                  iconBg: isDarkMode ? Colors.orange.withOpacity(0.2) : Colors.orange.shade100,
-                  title: "Weight Trend",
-                  subtitle: "-1.2kg since October",
-                  textColor: textColor,
-                  mutedColor: isDarkMode ? Colors.white.withOpacity(0.5) : textGreenMuted,
-                ),
-                Divider(height: 1, color: borderColor),
-                _buildTrendItem(
-                  icon: Icons.favorite_border,
-                  iconColor: Colors.purple,
-                  iconBg: isDarkMode ? Colors.purple.withOpacity(0.2) : Colors.purple.shade100,
-                  title: "Blood Pressure",
-                  subtitle: "118/75 mmHg (Optimal)",
-                  textColor: textColor,
-                  mutedColor: isDarkMode ? Colors.white.withOpacity(0.5) : textGreenMuted,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(13),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
-          )
+            child: Column(
+              children: [
+                // Day labels
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day) {
+                    return SizedBox(
+                      width: 36,
+                      child: Text(
+                        day,
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.manrope(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: textMuted,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 12),
+                // Bar chart
+                SizedBox(
+                  height: 120,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      _buildWeekBar(0.5, false, isDarkMode),
+                      _buildWeekBar(0.65, false, isDarkMode),
+                      _buildWeekBar(0.75, true, isDarkMode), // Today (Wednesday)
+                      _buildWeekBar(0.4, false, isDarkMode),
+                      _buildWeekBar(0.55, false, isDarkMode),
+                      _buildWeekBar(0.85, false, isDarkMode),
+                      _buildWeekBar(0.7, false, isDarkMode),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildTrendItem({
-    required IconData icon, required Color iconColor, required Color iconBg,
-    required String title, required String subtitle, required Color textColor, required Color mutedColor
-  }) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          Container(
-            width: 40, height: 40,
-            decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
-            child: Icon(icon, color: iconColor, size: 20),
+  Widget _buildWeekBar(double heightFactor, bool isToday, bool isDarkMode) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        Container(
+          width: 36,
+          height: 100 * heightFactor,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.bottomCenter,
+              end: Alignment.topCenter,
+              colors: isToday
+                  ? [primaryColor, primaryColor.withAlpha(200)]
+                  : [
+                      primaryColor.withAlpha(77),
+                      primaryColor.withAlpha(128),
+                    ],
+            ),
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: isToday
+                ? [
+                    BoxShadow(
+                      color: primaryColor.withAlpha(77),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : null,
           ),
-          const SizedBox(width: 16),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFloatingScanButton(BuildContext context, HealthDashboardState state) {
+    final bool isScanning = state.status == HealthDashboardStatus.scanning;
+
+    return GestureDetector(
+      onTap: isScanning ? null : () => _showScanOptions(context),
+      child: Container(
+        width: 60,
+        height: 60,
+        decoration: BoxDecoration(
+          color: isScanning ? primaryColor.withAlpha(150) : primaryColor,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: primaryColor.withAlpha(100),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Icon(
+          isScanning ? Icons.hourglass_empty : Icons.camera_alt_outlined,
+          color: Colors.white,
+          size: 28,
+        ),
+      ),
+    );
+  }
+
+  /// Show options for scanning (camera or gallery)
+  void _showScanOptions(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (bottomContext) {
+        final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+        final backgroundColor = isDarkMode ? const Color(0xFF1A2E24) : Colors.white;
+
+        return Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Text(title, style: GoogleFonts.manrope(fontSize: 14, fontWeight: FontWeight.bold, color: textColor)),
-              Text(subtitle, style: GoogleFonts.manrope(fontSize: 12, color: mutedColor)),
+              // Handle bar
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[400],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Scan Food',
+                style: GoogleFonts.manrope(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: isDarkMode ? Colors.white : textDark,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Take a photo or select from gallery to analyze nutrition',
+                style: GoogleFonts.manrope(
+                  fontSize: 14,
+                  color: textMuted,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildScanOptionButton(
+                      context: context,
+                      icon: Icons.camera_alt,
+                      label: 'Camera',
+                      onTap: () {
+                        Navigator.pop(bottomContext);
+                        context.read<HealthDashboardCubit>().scanMeal();
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildScanOptionButton(
+                      context: context,
+                      icon: Icons.photo_library,
+                      label: 'Gallery',
+                      onTap: () {
+                        Navigator.pop(bottomContext);
+                        context.read<HealthDashboardCubit>().scanMealFromGallery();
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
             ],
           ),
-          const Spacer(),
-          Icon(Icons.chevron_right, color: mutedColor),
-        ],
-      ),
+        );
+      },
     );
   }
 
+  /// Build scan option button
+  Widget _buildScanOptionButton({
+    required BuildContext context,
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
-
-
-
-}
-
-class HeartRatePainter extends CustomPainter {
-  final Color color;
-  HeartRatePainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 3
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    final path = Path();
-    final w = size.width;
-    final h = size.height;
-    
-    path.moveTo(0, h * 0.8);
-    path.cubicTo(w*0.05, h*0.7, w*0.1, h*0.9, w*0.15, h*0.6);
-    path.cubicTo(w*0.2, h*0.3, w*0.25, h*0.5, w*0.3, h*0.4);
-    path.cubicTo(w*0.35, h*0.3, w*0.4, h*0.7, w*0.45, h*0.6);
-    path.cubicTo(w*0.5, h*0.5, w*0.55, h*0.2, w*0.6, h*0.4);
-    path.cubicTo(w*0.65, h*0.6, w*0.7, h*0.4, w*0.75, h*0.5);
-    path.cubicTo(w*0.8, h*0.6, w*0.85, h*0.3, w*0.9, h*0.5);
-    path.cubicTo(w*0.95, h*0.7, w, h*0.6, w, h);
-
-    canvas.drawPath(path, paint);
-
-    final fillPaint = Paint()
-      ..style = PaintingStyle.fill
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [color.withOpacity(0.2), color.withOpacity(0.0)],
-      ).createShader(Rect.fromLTWH(0, 0, w, h));
-
-    final fillPath = Path.from(path)
-      ..lineTo(w, h)
-      ..lineTo(0, h)
-      ..close();
-
-    canvas.drawPath(fillPath, fillPaint);
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        decoration: BoxDecoration(
+          color: primaryColor.withAlpha(26),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: primaryColor.withAlpha(51)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: primaryColor, size: 32),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: GoogleFonts.manrope(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: isDarkMode ? Colors.white : textDark,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
