@@ -196,6 +196,10 @@ class HealthService {
   Future<String> _sendImageToAI(String base64Image) async {
     try {
       final response = await _aiService.analyzeImage(base64Image);
+      // Log first 200 chars to avoid truncation issues
+      final preview = response.length > 200 ? '${response.substring(0, 200)}...' : response;
+      debugPrint('[HealthService] AI response preview: $preview');
+      debugPrint('[HealthService] AI response total length: ${response.length}');
       return response;
     } catch (e) {
       debugPrint('[HealthService] AI request failed: $e');
@@ -207,6 +211,9 @@ class HealthService {
     try {
       String cleanedResponse = response.trim();
 
+      debugPrint('[HealthService] Parsing response length: ${cleanedResponse.length}');
+
+      // Remove markdown code blocks
       if (cleanedResponse.startsWith('```json')) {
         cleanedResponse = cleanedResponse.substring(7);
       } else if (cleanedResponse.startsWith('```')) {
@@ -217,19 +224,88 @@ class HealthService {
       }
       cleanedResponse = cleanedResponse.trim();
 
+      // Try direct JSON parse first (if response is clean JSON)
+      try {
+        final directParse = jsonDecode(cleanedResponse) as Map<String, dynamic>;
+        debugPrint('[HealthService] ✅ Direct JSON parse successful');
+        return directParse;
+      } catch (_) {
+        // Continue with extraction
+      }
+
+      // Find JSON object boundaries
       final startIndex = cleanedResponse.indexOf('{');
       final endIndex = cleanedResponse.lastIndexOf('}');
 
-      if (startIndex == -1 || endIndex == -1 || startIndex >= endIndex) {
-        throw HealthServiceException('Invalid JSON response');
+      if (startIndex != -1 && endIndex != -1 && startIndex < endIndex) {
+        final jsonString = cleanedResponse.substring(startIndex, endIndex + 1);
+        debugPrint('[HealthService] Extracted JSON length: ${jsonString.length}');
+
+        try {
+          final parsed = jsonDecode(jsonString) as Map<String, dynamic>;
+          debugPrint('[HealthService] ✅ JSON extraction successful: ${parsed['food_name']}');
+          return parsed;
+        } catch (e) {
+          debugPrint('[HealthService] JSON decode failed: $e');
+        }
       }
 
-      final jsonString = cleanedResponse.substring(startIndex, endIndex + 1);
-      return jsonDecode(jsonString) as Map<String, dynamic>;
+      // Fallback: extract nutrition info from text response
+      debugPrint('[HealthService] No valid JSON, extracting from text...');
+      return _extractNutritionFromText(cleanedResponse);
     } catch (e) {
-      debugPrint('[HealthService] Error parsing JSON: $e');
+      debugPrint('[HealthService] Error parsing: $e');
       return jsonDecode(_getMockFoodAnalysis()) as Map<String, dynamic>;
     }
+  }
+
+  /// Extract nutrition info from plain text response
+  Map<String, dynamic> _extractNutritionFromText(String text) {
+    final lowerText = text.toLowerCase();
+
+    // Try to find numbers for calories, protein, carbs, fat
+    int calories = _extractNumber(lowerText, ['calories', 'kcal', 'cal']) ?? 300;
+    int protein = _extractNumber(lowerText, ['protein']) ?? 15;
+    int carbs = _extractNumber(lowerText, ['carbs', 'carbohydrates', 'carbohydrate']) ?? 30;
+    int fat = _extractNumber(lowerText, ['fat', 'fats']) ?? 10;
+
+    // Try to extract food name from first line
+    String foodName = 'Detected Food';
+    final lines = text.split('\n');
+    if (lines.isNotEmpty) {
+      final firstLine = lines[0].replaceAll(RegExp(r'[*#]'), '').trim();
+      if (firstLine.length < 50 && firstLine.isNotEmpty) {
+        foodName = firstLine;
+      }
+    }
+
+    debugPrint('[HealthService] Extracted from text: $foodName, $calories cal');
+
+    return {
+      'food_name': foodName,
+      'calories': calories,
+      'protein': protein,
+      'carbs': carbs,
+      'fat': fat,
+    };
+  }
+
+  int? _extractNumber(String text, List<String> keywords) {
+    for (final keyword in keywords) {
+      // Pattern: "calories: 500" or "500 calories" or "calories 500"
+      final patterns = [
+        RegExp('$keyword[:\\s]+(\\d+)', caseSensitive: false),
+        RegExp('(\\d+)\\s*$keyword', caseSensitive: false),
+      ];
+
+      for (final pattern in patterns) {
+        final match = pattern.firstMatch(text);
+        if (match != null) {
+          return int.tryParse(match.group(1) ?? '');
+        }
+      }
+    }
+    return null;
   }
 
   String _getMockFoodAnalysis() {

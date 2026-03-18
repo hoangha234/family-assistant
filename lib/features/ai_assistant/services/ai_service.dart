@@ -27,14 +27,14 @@ class AIService {
 
   bool _useFallback = false;
   static const List<String> _availableModels = [
-    'gemini-1.5-flash',
-    'gemini-1.5-pro',
+    'gemini-2.5-flash',
     'gemini-2.0-flash',
-    'gemini-2.0-flash-lite',
+    'gemini-2.0-flash-001',
+    'gemini-2.5-pro',
   ];
 
-  // Try different API versions
-  static const List<String> _apiVersions = ['v1beta', 'v1'];
+  // Only v1beta API works for current models
+  static const List<String> _apiVersions = ['v1beta'];
   int _currentApiVersionIndex = 0;
 
   int _currentModelIndex = 0;
@@ -43,7 +43,7 @@ class AIService {
     String? apiKey,
     String? model,
   })  : _apiKey = apiKey ?? ApiKeys.geminiApiKey,
-        _model = model ?? 'gemini-2.0-flash',
+        _model = model ?? 'gemini-2.5-flash',
         _httpClient = HttpClient();
 
   String get _currentApiVersion => _apiVersions[_currentApiVersionIndex];
@@ -582,16 +582,16 @@ You are allowed to be conversational and informal when appropriate.
     }
     _lastRequestTime = DateTime.now();
 
-    // Vision-capable models to try - using same model that works for chat
+    // Vision-capable models to try - using models available from API
     final visionModels = [
-      'gemini-2.0-flash',        // Current working model for chat
-      'gemini-2.0-flash-exp',    // Experimental with vision
-      'gemini-1.5-flash',
-      'gemini-pro-vision',
+      'gemini-2.5-flash',         // Latest multimodal model
+      'gemini-2.0-flash',         // Current stable multimodal
+      'gemini-2.0-flash-001',     // Specific version
+      'gemini-2.5-pro',           // Pro version with vision
     ];
 
-    // API versions to try
-    final apiVersions = ['v1beta', 'v1'];
+    // Only use v1beta API version (v1 doesn't work for these models)
+    final apiVersions = ['v1beta'];
 
     final prompt = messages.isNotEmpty ? messages.last.content : 'Analyze this image';
 
@@ -690,18 +690,26 @@ You are allowed to be conversational and informal when appropriate.
 
   /// Analyze an image (for food scanning) and return structured JSON
   Future<String> analyzeImage(String base64Image) async {
-    const prompt = '''Analyze this food image and estimate the nutritional information.
-Return ONLY a valid JSON object with no additional text or markdown:
-{
-  "food_name": "name of the food",
-  "calories": estimated calories as integer,
-  "protein": protein in grams as integer,
-  "carbs": carbohydrates in grams as integer,
-  "fat": fat in grams as integer
-}
+    const prompt = '''You are a nutrition analysis AI. Analyze this food image.
 
-Be realistic with your estimates based on typical serving sizes.
-If you cannot identify the food, make your best guess based on what you see.''';
+CRITICAL: You MUST respond with ONLY a JSON object. No explanations, no markdown, no extra text.
+
+Output format (copy exactly, fill in values):
+{"food_name":"NAME","calories":NUMBER,"protein":NUMBER,"carbs":NUMBER,"fat":NUMBER}
+
+Rules:
+- food_name: Short name of the food (max 30 chars)
+- calories: Total estimated calories (integer)
+- protein: Grams of protein (integer)
+- carbs: Grams of carbohydrates (integer)  
+- fat: Grams of fat (integer)
+- Base estimates on a typical single serving
+- If unsure, make reasonable estimates
+
+Example response:
+{"food_name":"Grilled Chicken Salad","calories":350,"protein":30,"carbs":15,"fat":18}
+
+Now analyze the image and respond with JSON only:''';
 
     final messages = [
       MessageModel(
@@ -713,7 +721,9 @@ If you cannot identify the food, make your best guess based on what you see.''';
     ];
 
     return sendMessageWithImage(messages, base64Image);
-  }  void dispose() {
+  }
+
+  void dispose() {
     _httpClient.close();
   }
 }
