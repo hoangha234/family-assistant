@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../cubit/health_dashboard_cubit.dart';
 import '../models/food_analysis_model.dart';
+import 'sleep_details_screen.dart';
+import 'hydration_screen.dart';
 
 class HealthDashboardScreen extends StatelessWidget {
   const HealthDashboardScreen({super.key});
@@ -34,9 +36,9 @@ class HealthDashboardView extends StatelessWidget {
 
     return BlocConsumer<HealthDashboardCubit, HealthDashboardState>(
       listener: (context, state) {
-        // Show snackbar on scan success
+        // Show bottom sheet on scan success
         if (state.status == HealthDashboardStatus.scanSuccess && state.lastScannedFood != null) {
-          _showScanResultSnackbar(context, state.lastScannedFood!);
+          _showScanResultBottomSheet(context, state.lastScannedFood!);
         }
         // Show error snackbar
         if (state.status == HealthDashboardStatus.scanError) {
@@ -62,7 +64,7 @@ class HealthDashboardView extends StatelessWidget {
                     const SizedBox(height: 16),
                     _buildStepsCard(context, state, cardColor, textColor, isDarkMode),
                     const SizedBox(height: 16),
-                    _buildSleepWaterRow(state, cardColor, textColor, isDarkMode),
+                    _buildSleepWaterRow(context, state, cardColor, textColor, isDarkMode),
                     const SizedBox(height: 24),
                     _buildTodayHealthSummary(state, cardColor, textColor, isDarkMode),
                     const SizedBox(height: 24),
@@ -89,27 +91,133 @@ class HealthDashboardView extends StatelessWidget {
     );
   }
 
-  /// Show snackbar with scan result
-  void _showScanResultSnackbar(BuildContext context, FoodAnalysis food) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '✅ ${food.foodName}',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            Text(
-              '${food.calories} cal • ${food.protein}g protein • ${food.carbs}g carbs • ${food.fat}g fat',
-              style: const TextStyle(fontSize: 12),
-            ),
-          ],
+  /// Show bottom sheet with scan result
+  void _showScanResultBottomSheet(BuildContext context, FoodAnalysis food) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (bottomContext) {
+        final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+        final backgroundColor = isDarkMode ? const Color(0xFF1A2E24) : Colors.white;
+
+        return Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle bar
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[400],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Icon(Icons.restaurant_menu, size: 48, color: primaryColor),
+              const SizedBox(height: 16),
+              Text(
+                'Scan Result',
+                style: GoogleFonts.manrope(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: isDarkMode ? Colors.white : textDark,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: primaryColor.withAlpha(26),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: primaryColor.withAlpha(51)),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      food.foodName,
+                      style: GoogleFonts.manrope(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: isDarkMode ? Colors.white : textDark,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _buildNutritionItem('Calories', '${food.calories} kcal', isDarkMode),
+                        _buildNutritionItem('Protein', '${food.protein}g', isDarkMode),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _buildNutritionItem('Carbs', '${food.carbs}g', isDarkMode),
+                        _buildNutritionItem('Fat', '${food.fat}g', isDarkMode),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(bottomContext),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryColor,
+                    foregroundColor: textDark,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: Text(
+                    'Close',
+                    style: GoogleFonts.manrope(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildNutritionItem(String label, String value, bool isDarkMode) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: GoogleFonts.manrope(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: isDarkMode ? Colors.white : textDark,
+          ),
         ),
-        backgroundColor: primaryColor,
-        duration: const Duration(seconds: 3),
-      ),
+        Text(
+          label,
+          style: GoogleFonts.manrope(
+            fontSize: 12,
+            color: textMuted,
+          ),
+        ),
+      ],
     );
   }
 
@@ -284,7 +392,7 @@ class HealthDashboardView extends StatelessWidget {
     );
   }
 
-  Widget _buildSleepWaterRow(HealthDashboardState state, Color cardColor, Color textColor, bool isDarkMode) {
+  Widget _buildSleepWaterRow(BuildContext context, HealthDashboardState state, Color cardColor, Color textColor, bool isDarkMode) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
@@ -301,6 +409,12 @@ class HealthDashboardView extends StatelessWidget {
               value: state.sleepFormatted,
               goal: "Goal: ${state.sleepGoal.toInt()}h",
               progress: state.sleepProgress,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SleepDetailsScreen()),
+                );
+              },
             ),
           ),
           const SizedBox(width: 12),
@@ -316,6 +430,12 @@ class HealthDashboardView extends StatelessWidget {
               value: state.waterFormatted,
               goal: "Goal: ${state.waterGoal}L",
               progress: state.waterProgress,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const HydrationScreen()),
+                );
+              },
             ),
           ),
         ],
@@ -333,9 +453,12 @@ class HealthDashboardView extends StatelessWidget {
     required String value,
     required String goal,
     required double progress,
+    VoidCallback? onTap,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(16),
@@ -396,7 +519,7 @@ class HealthDashboardView extends StatelessWidget {
           ),
         ],
       ),
-    );
+    ));
   }
 
   Widget _buildTodayHealthSummary(HealthDashboardState state, Color cardColor, Color textColor, bool isDarkMode) {

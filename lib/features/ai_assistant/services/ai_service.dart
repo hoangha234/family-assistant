@@ -626,7 +626,8 @@ You are allowed to be conversational and informal when appropriate.
             'generationConfig': {
               'temperature': 0.4,
               'topP': 0.8,
-              'maxOutputTokens': 500,
+              'maxOutputTokens': 1024,
+              'responseMimeType': 'application/json',
             },
           });
 

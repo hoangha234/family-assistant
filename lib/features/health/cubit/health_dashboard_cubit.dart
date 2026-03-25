@@ -134,16 +134,9 @@ class HealthDashboardCubit extends Cubit<HealthDashboardState> {
 
       debugPrint('[HealthDashboardCubit] Food analysis: $analysis');
 
-      // Add nutrition to daily totals
-      final updatedData = await _healthService.addMealNutrition(analysis);
-
-      // Update state with new nutrition data
+      // Just update state with the scan result, don't save to DB or add to daily summary
       emit(state.copyWith(
         status: HealthDashboardStatus.scanSuccess,
-        dailyCalories: updatedData.calories,
-        protein: updatedData.protein,
-        carbs: updatedData.carbs,
-        fat: updatedData.fat,
         lastScannedFood: analysis,
       ));
 
@@ -191,15 +184,9 @@ class HealthDashboardCubit extends Cubit<HealthDashboardState> {
       final imageFile = File(image.path);
       final analysis = await _healthService.analyzeFoodImage(imageFile);
 
-      // Add nutrition to daily totals
-      final updatedData = await _healthService.addMealNutrition(analysis);
-
+      // Just update state with the scan result, don't save to DB or add to daily summary
       emit(state.copyWith(
         status: HealthDashboardStatus.scanSuccess,
-        dailyCalories: updatedData.calories,
-        protein: updatedData.protein,
-        carbs: updatedData.carbs,
-        fat: updatedData.fat,
         lastScannedFood: analysis,
       ));
 
@@ -258,6 +245,9 @@ class HealthDashboardCubit extends Cubit<HealthDashboardState> {
             carbs: data.carbs,
             fat: data.fat,
             activityMinutes: data.activityMinutes,
+            waterLiters: data.waterLiters,
+            sleepHours: data.sleepHours,
+            steps: data.steps,
           ));
         }
       },
