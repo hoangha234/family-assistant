@@ -128,26 +128,64 @@ class MealPlanView extends StatelessWidget {
     required bool isDarkMode,
   }) {
     if (meal != null) {
-      return _buildMealCard(
-        title: meal.name,
-        type: meal.type.displayName,
-        kcal: meal.calories.toString(),
-        carbs: "${meal.carbs}g",
-        protein: "${meal.protein}g",
-        fat: "${meal.fats}g",
-        imageUrl: meal.imageUrl,
-        imageBytes: meal.imageBytes,
-        cardColor: cardColor,
-        textColor: textColor,
-        primaryColor: primaryColor,
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => MealDetailScreen(meal: meal),
-            ),
+      return Dismissible(
+        key: Key('meal_${meal.id}_${meal.type.name}'),
+        direction: DismissDirection.endToStart,
+        background: Container(
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.only(right: 24),
+          decoration: BoxDecoration(
+            color: Colors.red.shade400,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [BoxShadow(color: Colors.black.withAlpha(13), blurRadius: 4)],
+          ),
+          child: const Icon(Icons.delete_outline, color: Colors.white, size: 28),
+        ),
+        confirmDismiss: (direction) async {
+          return await showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: Text("Delete Meal", style: GoogleFonts.manrope(fontWeight: FontWeight.bold)),
+                content: Text("Are you sure you want to delete ${meal.name}? This will also remove the calories from today's Health progress.", style: GoogleFonts.manrope()),
+                actions: <Widget>[
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: Text("Cancel", style: GoogleFonts.manrope(color: Colors.grey)),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    child: Text("Delete", style: GoogleFonts.manrope(color: Colors.red, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              );
+            },
           );
         },
+        onDismissed: (direction) {
+          context.read<MealPlanCubit>().deleteMeal(meal.type);
+        },
+        child: _buildMealCard(
+          title: meal.name,
+          type: meal.type.displayName,
+          kcal: meal.calories.toString(),
+          carbs: "${meal.carbs}g",
+          protein: "${meal.protein}g",
+          fat: "${meal.fats}g",
+          imageUrl: meal.imageUrl,
+          imageBytes: meal.imageBytes,
+          cardColor: cardColor,
+          textColor: textColor,
+          primaryColor: primaryColor,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => MealDetailScreen(meal: meal),
+              ),
+            );
+          },
+        ),
       );
     } else {
       return _buildEmptyMealCard(

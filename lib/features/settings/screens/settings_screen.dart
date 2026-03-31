@@ -6,6 +6,7 @@ import '../cubit/settings_cubit.dart';
 import '../../home/cubit/home_cubit.dart';
 import '../../auth/cubit/auth_cubit.dart';
 import '../../auth/screens/login_screen.dart';
+import 'edit_profile_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -14,8 +15,7 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
-        BlocProvider(create: (context) => SettingsCubit()),
-        BlocProvider(create: (context) => AuthCubit()),
+        BlocProvider(create: (context) => AuthCubit()..initialize()),
       ],
       child: const SettingsView(),
     );
@@ -74,6 +74,17 @@ class SettingsView extends StatelessWidget {
                               textColor: textColor,
                               showBorder: false,
                               borderColor: borderColor,
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => BlocProvider.value(
+                                      value: context.read<AuthCubit>(),
+                                      child: const EditProfileScreen(),
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
                           ],
                         ),
@@ -265,51 +276,83 @@ class SettingsView extends StatelessWidget {
   }
 
   Widget _buildProfileHeader(Color textColor, Color borderColor) {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        children: [
-          Stack(
+    return BlocBuilder<AuthCubit, AuthState>(
+      builder: (context, state) {
+        String name = "Guest";
+        String email = "No email";
+        String photoUrl = "https://i.pravatar.cc/150?img=12";
+
+        if (state.status == AuthStatus.authenticated && state.user != null) {
+          name = state.user!.displayName ?? name;
+          email = state.user!.email ?? email;
+          photoUrl = state.user!.photoUrl ?? photoUrl;
+        }
+
+        return Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
             children: [
-              Container(
-                width: 112,
-                height: 112,
-                decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: borderColor, width: 4),
-                    image: const DecorationImage(
-                      image: NetworkImage("https://i.pravatar.cc/150?img=12"),
-                      fit: BoxFit.cover,
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => BlocProvider.value(
+                        value: context.read<AuthCubit>(),
+                        child: const EditProfileScreen(),
+                      ),
                     ),
-                    boxShadow: [
-                      BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4))
-                    ]),
-              ),
-              Positioned(
-                bottom: 4,
-                right: 4,
-                child: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                      color: primaryColor,
-                      shape: BoxShape.circle,
-                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)]),
-                  child: const Icon(Icons.edit, color: Colors.white, size: 14),
+                  );
+                },
+                child: Stack(
+                  children: [
+                    Container(
+                      width: 112,
+                      height: 112,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: borderColor, width: 4),
+                        color: Colors.grey[200],
+                        image: photoUrl.isNotEmpty
+                            ? DecorationImage(
+                                image: NetworkImage(photoUrl),
+                                fit: BoxFit.cover,
+                              )
+                            : null,
+                        boxShadow: [
+                          BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4))
+                        ],
+                      ),
+                      child: photoUrl.isEmpty ? const Icon(Icons.person, size: 60, color: Colors.grey) : null,
+                    ),
+                    Positioned(
+                      bottom: 4,
+                      right: 4,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                            color: const Color(0xFF2B7CEE),
+                            shape: BoxShape.circle,
+                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)]),
+                        child: const Icon(Icons.edit, color: Colors.white, size: 14),
+                      ),
+                    ),
+                  ],
                 ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                name,
+                style: GoogleFonts.manrope(fontSize: 24, fontWeight: FontWeight.bold, color: textColor),
+              ),
+              Text(
+                email,
+                style: GoogleFonts.manrope(fontSize: 14, color: textGrey),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Text(
-            "Hoang Ha",
-            style: GoogleFonts.manrope(fontSize: 24, fontWeight: FontWeight.bold, color: textColor),
-          ),
-          Text(
-            "hoang220228@gmail.com",
-            style: GoogleFonts.manrope(fontSize: 14, color: textGrey),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -351,12 +394,15 @@ class SettingsView extends StatelessWidget {
     required Color textColor,
     required bool showBorder,
     required Color borderColor,
+    VoidCallback? onTap,
   }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        border: showBorder ? Border(bottom: BorderSide(color: borderColor)) : null,
-      ),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          border: showBorder ? Border(bottom: BorderSide(color: borderColor)) : null,
+        ),
       child: Row(
         children: [
           Container(
@@ -382,7 +428,7 @@ class SettingsView extends StatelessWidget {
           Icon(Icons.chevron_right, color: textGrey, size: 20),
         ],
       ),
-    );
+    ));
   }
 
   Widget _buildSwitchTile({

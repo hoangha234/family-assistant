@@ -18,6 +18,26 @@ class SleepCubit extends Cubit<SleepState> {
   void _init() {
     emit(state.copyWith(status: SleepStatus.loading));
     _subscribeToSleepData();
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    try {
+      final history30 = await _sleepService.loadSleepHistory(days: 30);
+      
+      // Get the last 7 days history (already sorted descending)
+      // Reverse to show chronologically from left to right on UI
+      final history7 = history30.take(7).toList().reversed.toList();
+      
+      if (!isClosed) {
+        emit(state.copyWith(
+          history30Days: history30,
+          history7Days: history7,
+        ));
+      }
+    } catch (e) {
+      debugPrint('[SleepCubit] Error loading history: $e');
+    }
   }
 
   void _subscribeToSleepData() {
@@ -87,6 +107,15 @@ class SleepCubit extends Cubit<SleepState> {
     
     final now = DateTime.now();
     return now.isAfter(data.wakeup);
+  }
+
+  Future<void> deleteTodayData() async {
+    try {
+      await _sleepService.deleteTodayData();
+      await _loadHistory();
+    } catch (e) {
+      debugPrint('[SleepCubit] Error deleting today data: $e');
+    }
   }
 
   @override

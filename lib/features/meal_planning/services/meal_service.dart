@@ -96,38 +96,34 @@ Your task is to generate a healthy meal recipe based on the ingredients provided
 STRICT RULES:
 1. Use primarily the ingredients provided by the user.
 2. You may add minimal common pantry items (salt, oil, pepper, water, basic spices).
-3. Nutrition values (calories, protein, carbs, fats) must be realistic and accurate.
-4. The image_prompt must describe a professional food photograph suitable for a recipe app.
-5. Instructions should be clear, numbered steps.
-6. Ingredients list should include quantities.
+You are a professional nutrition expert and chef integrated into the "Family Assistant" app.
+Your task is to design a meal based strictly on the ingredients provided by the user (basic spices can be added).
+
+CRITICAL CONTEXT & DAILY BUDGET:
+The user has a STRICT daily limit of <= 2200 kcal and <= 120g protein across ALL 3 MEALS. 
+You must psychologically allocate these limits for Breakfast, Lunch, and Dinner. 
+However, you MUST ONLY generate the recipe and details for the SINGLE specific MEAL TYPE requested below.
+Ensure the macros for this specific meal fit logically within that daily budget (e.g. Breakfast should not be 1500 kcal).
+
+MEAL TYPE TO GENERATE: {{MEAL_TYPE}}
 
 OUTPUT FORMAT:
-You MUST return ONLY valid JSON in this exact format, with no additional text, markdown, or explanation:
-
+You MUST return ONLY valid JSON in this exact structure, with no extra text or markdown blocks:
 {
-  "name": "Meal Name Here",
-  "description": "A brief appetizing description of the dish in 1-2 sentences.",
-  "calories": 450,
-  "protein": 35,
-  "carbs": 25,
-  "fats": 18,
-  "ingredients": [
-    "400g chicken breast",
-    "2 tablespoons olive oil",
-    "1 teaspoon salt"
-  ],
-  "instructions": [
-    "Preheat oven to 200°C.",
-    "Season chicken with salt and pepper.",
-    "Cook for 25 minutes until golden."
-  ],
-  "image_prompt": "Professional food photography of [dish name], beautifully plated, natural lighting, shallow depth of field"
+  "name": "Dish name",
+  "description": "Short description",
+  "calories": 400,
+  "protein": 30,
+  "carbs": 20,
+  "fats": 10,
+  "ingredients": ["1. ...", "2. ..."],
+  "instructions": ["1. ...", "2. ..."],
+  "image_prompt": "Beautiful food photography of..."
 }
 
 IMPORTANT:
 - Return ONLY the JSON object, nothing else.
 - Do NOT wrap in markdown code blocks.
-- Do NOT add any explanation before or after.
 - Ensure all JSON is properly formatted and valid.
 ''';
 
@@ -153,7 +149,7 @@ IMPORTANT:
       // Otherwise use direct API
       return await _generateMealViaDirectAPI(ingredients, mealType);
     } catch (e) {
-      debugPrint('[MealService] Error: $e');
+      debugPrint('[MealService] Error generating meal: $e');
       // If parsing fails, return a fallback meal
       if (e.toString().contains('parse') || e.toString().contains('JSON')) {
         return _generateFallbackMeal(ingredients, mealType);
@@ -346,8 +342,11 @@ IMPORTANT:
       // Parse JSON
       final parsed = jsonDecode(jsonString) as Map<String, dynamic>;
 
-      // Validate required fields
-      if (!parsed.containsKey('name') || !parsed.containsKey('calories')) {
+      // Validate required fields for either single meal or daily menu
+      final isSingleMeal = parsed.containsKey('name');
+      final isDailyMenu = parsed.containsKey('daily_summary') && parsed.containsKey('meals');
+      
+      if (!isSingleMeal && !isDailyMenu) {
         throw MealServiceException('AI response missing required fields');
       }
 

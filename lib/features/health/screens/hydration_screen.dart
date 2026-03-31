@@ -1,24 +1,42 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'dart:math' as math;
 
 import '../cubit/hydration_cubit.dart';
 import '../cubit/hydration_state.dart';
 import '../services/hydration_service.dart';
 import '../models/hydration_log_model.dart';
+import '../services/notification_service.dart';
 
-class HydrationScreen extends StatelessWidget {
+class HydrationScreen extends StatefulWidget {
   const HydrationScreen({super.key});
 
-  // Colors
+  @override
+  State<HydrationScreen> createState() => _HydrationScreenState();
+}
+
+class _HydrationScreenState extends State<HydrationScreen> {
   static const Color primaryGreen = Color(0xFF006E36);
   static const Color primaryMint = Color(0xFF6DFE9C);
-  static const Color background = Color(0xFFF7F9FB);
-  static const Color surfaceWhite = Colors.white;
-  static const Color textMain = Color(0xFF2C3437);
-  static const Color textVariant = Color(0xFF596064);
+
+  bool get isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get background => isDark ? const Color(0xFF101822) : const Color(0xFFF7F9FB);
+  Color get surfaceWhite => isDark ? const Color(0xFF1A2737) : Colors.white;
+  Color get textMain => isDark ? Colors.white : const Color(0xFF2C3437);
+  Color get textVariant => isDark ? Colors.grey[400]! : const Color(0xFF596064);
+  Color get cardBg => isDark ? const Color(0xFF1E293B) : const Color(0xFFF0F4F7);
+
+  @override
+  void initState() {
+    super.initState();
+    _requestNotificationPermissions();
+  }
+
+  Future<void> _requestNotificationPermissions() async {
+    await NotificationService.requestPermissions();
+  }
 
   void _showHistoryModal(BuildContext context) {
     showModalBottomSheet(
@@ -32,457 +50,527 @@ class HydrationScreen extends StatelessWidget {
     );
   }
 
-  void _showAddWaterDialog(BuildContext context, String session) {
-    showDialog(
+  Future<void> _editStartTime(
+    BuildContext context,
+    DateTime currentStartTime,
+  ) async {
+    final TimeOfDay? newTime = await showTimePicker(
       context: context,
-      builder: (_) => BlocProvider.value(
-        value: context.read<HydrationCubit>(),
-        child: _AddWaterDialog(session: session),
-      ),
+      initialTime: TimeOfDay.fromDateTime(currentStartTime),
     );
+
+    if (newTime != null && context.mounted) {
+      if (newTime.hour >= 8) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              "It's too late to start now! Please choose a time from 7:59 AM or earlier to have enough time to drink all your water for the day.",
+            ),
+            backgroundColor: Color(0xFFC62828),
+          ),
+        );
+        return;
+      }
+
+      final now = DateTime.now();
+      final updatedStartTime = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        newTime.hour,
+        newTime.minute,
+      );
+      context.read<HydrationCubit>().updateStartTime(updatedStartTime);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => HydrationCubit(
-        hydrationService: HydrationService(),
-      ),
+      create: (context) => HydrationCubit(hydrationService: HydrationService()),
       child: Builder(
         builder: (context) {
           return Scaffold(
             backgroundColor: background,
-            appBar: AppBar(
-              backgroundColor: background.withOpacity(0.8),
-              elevation: 0,
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back, color: primaryGreen),
-                onPressed: () => Navigator.pop(context),
-              ),
-              title: Text(
-                'Hydration',
-                style: GoogleFonts.manrope(
-                  color: primaryGreen,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 20,
-                ),
-              ),
-              centerTitle: true,
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.history, color: primaryGreen),
-                  onPressed: () {
-                    context.read<HydrationCubit>().loadRecentLogs();
-                    _showHistoryModal(context);
-                  },
-                ),
-              ],
-            ),
-            body: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-              child: Column(
-                children: [
-                  _buildCircularProgress(),
-                  const SizedBox(height: 40),
-                  _buildSessionActionCards(context),
-                  const SizedBox(height: 40),
-                  _buildRecentLogsHeader(context),
-                  const SizedBox(height: 16),
-                  _buildRecentLogsList(),
-                  const SizedBox(height: 32),
-                  _buildProTip(),
-                  const SizedBox(height: 40),
-                ],
-              ),
+            appBar: _buildAppBar(context),
+            body: BlocBuilder<HydrationCubit, HydrationState>(
+              builder: (context, state) {
+                if (state.status == HydrationStatus.loading ||
+                    state.status == HydrationStatus.initial) {
+                  return const Center(
+                    child: CircularProgressIndicator(color: primaryGreen),
+                  );
+                }
+
+                if (state.errorMessage != null &&
+                    state.errorMessage!.isNotEmpty) {
+                  return Center(child: Text('Error: ${state.errorMessage}'));
+                }
+
+                final plan = state.todayPlan;
+                if (plan == null)
+                  return const Center(child: Text('No plan found.'));
+
+                final drankCups = state.currentLevel;
+                final totalGoal = state.dailyGoal;
+                final perCup = state.waterPerCup;
+                final canConfirmDrink = context.read<HydrationCubit>().canConfirmDrink;
+
+                DateTime? nextSession;
+                if (drankCups < 5) {
+                  nextSession = plan.sessions[drankCups];
+                }
+
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 16,
+                  ),
+                  child: Column(
+                    children: [
+                      _buildBottleVisual(drankCups, totalGoal, perCup),
+                      const SizedBox(height: 40),
+                      _buildSessionProgress(plan.sessions, drankCups),
+                      const SizedBox(height: 32),
+                      _buildHydrationPlanCard(
+                        context,
+                        plan.startTime,
+                        plan.sessions,
+                      ),
+                      const SizedBox(height: 40),
+                      _buildDrunkButton(context, drankCups, canConfirmDrink, nextSession),
+                      const SizedBox(height: 40),
+                    ],
+                  ),
+                );
+              },
             ),
           );
-        }
+        },
       ),
     );
   }
 
-  Widget _buildCircularProgress() {
-    return BlocBuilder<HydrationCubit, HydrationState>(
-      builder: (context, state) {
-        final progress = state.progress;
-        final totalStr = (state.totalAmountToday / 1000).toStringAsFixed(1);
-        final goalStr = (state.dailyGoal / 1000).toStringAsFixed(1);
-        final percentStr = (progress * 100).toInt().toString();
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
+    return AppBar(
+      backgroundColor: background.withOpacity(0.8),
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      leading: IconButton(
+        icon: Icon(Icons.arrow_back, color: textMain),
+        onPressed: () => Navigator.pop(context),
+      ),
+      title: Text(
+        'Hydration Schedule',
+        style: GoogleFonts.manrope(
+          color: textMain,
+          fontWeight: FontWeight.bold,
+          fontSize: 20,
+        ),
+      ),
+      actions: [
+        IconButton(
+          icon: Icon(Icons.history, color: textMain),
+          onPressed: () {
+            context.read<HydrationCubit>().loadRecentLogs();
+            _showHistoryModal(context);
+          },
+        ),
+        const Padding(
+          padding: EdgeInsets.only(right: 16),
+          child: CircleAvatar(
+            radius: 16,
+            backgroundImage: NetworkImage('https://picsum.photos/200'),
+          ),
+        ),
+      ],
+    );
+  }
 
-        return Center(
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Container(
-                width: 260,
-                height: 260,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: surfaceWhite,
-                  boxShadow: [
-                    BoxShadow(
-                      color: primaryGreen.withOpacity(0.08),
-                      blurRadius: 50,
-                      offset: const Offset(0, 20),
-                    ),
-                  ],
-                ),
+  Widget _buildBottleVisual(int drankCups, int totalGoal, int perCup) {
+    final double targetHeightFactor = (drankCups / 5).clamp(0.0, 1.0);
+
+    return Center(
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            left: -20,
+            top: 0,
+            child: Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                color: primaryMint.withOpacity(0.2),
+                shape: BoxShape.circle,
               ),
-              SizedBox(
-                width: 230,
-                height: 230,
-                child: CustomPaint(
-                  painter: HydrationProgressPainter(
-                    progress: progress,
-                    primaryColor: primaryGreen,
-                    accentColor: primaryMint,
-                    trackColor: const Color(0xFFEAEFF2),
-                  ),
-                ),
+            ),
+          ),
+          Container(
+            width: 180,
+            height: 320,
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(64),
+                bottom: Radius.circular(40),
               ),
-              Column(
-                mainAxisSize: MainAxisSize.min,
+              border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFDCE4E8), width: 6),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(58),
+                bottom: Radius.circular(34),
+              ),
+              child: Stack(
+                alignment: Alignment.bottomCenter,
                 children: [
-                  Text(
-                    '${totalStr}L',
-                    style: GoogleFonts.manrope(
-                      fontSize: 48,
-                      fontWeight: FontWeight.w800,
-                      color: textMain,
-                    ),
+                  TweenAnimationBuilder<double>(
+                    tween: Tween<double>(begin: 0, end: targetHeightFactor),
+                    duration: const Duration(milliseconds: 800),
+                    curve: Curves.easeInOutBack,
+                    builder: (context, value, child) {
+                      return FractionallySizedBox(
+                        heightFactor: value.clamp(0.0, double.infinity),
+                        alignment: Alignment.bottomCenter,
+                        child: Container(
+                          width: double.infinity,
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [primaryGreen, primaryMint],
+                              begin: Alignment.bottomCenter,
+                              end: Alignment.topCenter,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                  Text(
-                    '/ ${goalStr}L Goal',
-                    style: const TextStyle(
-                      color: textVariant,
-                      fontWeight: FontWeight.w500,
-                      fontSize: 14,
-                    ),
+                  Column(
+                    children: List.generate(5, (index) {
+                      return Expanded(
+                        child: Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            border: index == 0
+                                ? null
+                                : Border(
+                                    top: BorderSide(
+                                      color: Colors.white.withOpacity(0.4),
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      );
+                    }),
                   ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFD3E4FE),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                ],
+              ),
+            ),
+          ),
+          Positioned(
+            top: 140,
+            right: -30,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: surfaceWhite.withOpacity(0.9),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  RichText(
+                    text: TextSpan(
                       children: [
-                        const Icon(Icons.water_drop, size: 12, color: Color(0xFF435368)),
-                        const SizedBox(width: 4),
-                        Text(
-                          '$percentStr% DAILY GOAL',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF435368),
+                        TextSpan(
+                          text: '${drankCups * perCup}',
+                          style: GoogleFonts.manrope(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w800,
+                            color: primaryGreen,
+                          ),
+                        ),
+                        TextSpan(
+                          text: 'ml',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: textVariant,
                           ),
                         ),
                       ],
                     ),
                   ),
+                  Text(
+                    'of ${totalGoal}ml',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: textVariant,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
                 ],
               ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildSessionActionCards(BuildContext context) {
-    return BlocBuilder<HydrationCubit, HydrationState>(
-      builder: (context, state) {
-        final morningAmount = (state.getAmountForSession('Morning') / 1000).toStringAsFixed(1);
-        final afterAmount = (state.getAmountForSession('Afternoon') / 1000).toStringAsFixed(1);
-        final eveningAmount = (state.getAmountForSession('Evening') / 1000).toStringAsFixed(1);
-
-        return Row(
-          children: [
-            _sessionCard(context, Icons.light_mode, 'Morning', '${morningAmount}L'),
-            const SizedBox(width: 12),
-            _sessionCard(context, Icons.wb_sunny, 'Afternoon', '${afterAmount}L'),
-            const SizedBox(width: 12),
-            _sessionCard(context, Icons.dark_mode, 'Evening', '${eveningAmount}L'),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _sessionCard(BuildContext context, IconData icon, String title, String amount) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => _showAddWaterDialog(context, title),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          decoration: BoxDecoration(
-            color: surfaceWhite,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.03),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textVariant)),
-              const SizedBox(height: 8),
-              Icon(icon, color: Colors.blueAccent.shade100, size: 24),
-              const SizedBox(height: 4),
-              Text(amount, style: const TextStyle(fontSize: 10, color: Colors.blueGrey)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRecentLogsHeader(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Text(
-          'Recent Logs',
-          style: GoogleFonts.manrope(fontSize: 24, fontWeight: FontWeight.bold, color: textMain),
-        ),
-        TextButton(
-          onPressed: () {
-            context.read<HydrationCubit>().loadRecentLogs();
-            _showHistoryModal(context);
-          },
-          child: const Text('View All', style: TextStyle(color: primaryGreen, fontWeight: FontWeight.bold)),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRecentLogsList() {
-    return BlocBuilder<HydrationCubit, HydrationState>(
-      builder: (context, state) {
-        if (state.todayLogs.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 24),
-            child: Text('No logs yet for today. Stay hydrated!', style: TextStyle(color: textVariant)),
-          );
-        }
-
-        final recentLogs = state.todayLogs.take(5).toList();
-
-        return Column(
-          children: recentLogs.map((log) {
-            final timeStr = DateFormat('hh:mm a').format(log.timestamp);
-            Color borderColor = primaryGreen;
-            if (log.session == 'Afternoon') borderColor = primaryMint;
-            if (log.session == 'Evening') borderColor = Colors.blueAccent.shade100;
-            return _buildLogEntry('${log.amount}ml', '$timeStr • ${log.session}', borderColor);
-          }).toList(),
-        );
-      },
-    );
-  }
-
-  Widget _buildLogEntry(String amount, String time, Color borderColor) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: surfaceWhite,
-        borderRadius: BorderRadius.circular(16),
-        border: Border(left: BorderSide(color: borderColor, width: 4)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: const BoxDecoration(color: Color(0xFFD3E4FE), shape: BoxShape.circle),
-            child: const Icon(Icons.water_drop, color: Color(0xFF435368)),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(amount, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                Text(time, style: const TextStyle(color: textVariant, fontSize: 13)),
-              ],
             ),
           ),
-          const Icon(Icons.more_vert, color: Colors.black26),
         ],
       ),
     );
   }
 
-  Widget _buildProTip() {
+  Widget _buildSessionProgress(List<DateTime> sessions, int drankCups) {
+    if (sessions.isEmpty) return const SizedBox.shrink();
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: List.generate(5, (index) {
+        bool isCompleted = index < drankCups;
+        String timeStr = index < sessions.length
+            ? DateFormat('HH:mm').format(sessions[index])
+            : '--:--';
+
+        return Column(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: isCompleted ? primaryMint : Colors.transparent,
+                shape: BoxShape.circle,
+                border: isCompleted
+                    ? null
+                    : Border.all(color: textVariant.withOpacity(0.3), width: 2),
+              ),
+              child: Icon(
+                isCompleted ? Icons.check_circle : Icons.water_drop,
+                size: 20,
+                color: isCompleted
+                    ? primaryGreen
+                    : textVariant.withOpacity(0.4),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              timeStr,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: isCompleted ? FontWeight.bold : FontWeight.w500,
+                color: isCompleted ? primaryGreen : textVariant,
+              ),
+            ),
+          ],
+        );
+      }),
+    );
+  }
+
+  Widget _buildHydrationPlanCard(
+    BuildContext context,
+    DateTime startTime,
+    List<DateTime> sessions,
+  ) {
+    bool extendsNextDay = false;
+    if (sessions.isNotEmpty) {
+      final lastSession = sessions.last;
+      if (lastSession.day != startTime.day) {
+        extendsNextDay = true;
+      }
+    }
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: const Color(0xFFE3E9ED),
-        borderRadius: BorderRadius.circular(16),
+        color: cardBg,
+        borderRadius: BorderRadius.circular(24),
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text('PRO TIP', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-                SizedBox(height: 8),
-                Text(
-                  'Staying hydrated improves focus and energy levels by 20% throughout the day.',
-                  style: TextStyle(fontWeight: FontWeight.w500, height: 1.4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Hydration Plan',
+                style: GoogleFonts.manrope(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: textMain,
+                ),
+              ),
+              GestureDetector(
+                onTap: () => _editStartTime(context, startTime),
+                child: const Icon(Icons.edit, color: primaryGreen, size: 20),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: surfaceWhite,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFD3E4FE),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.schedule, color: isDark ? Colors.blue[200] : const Color(0xFF435368)),
+                ),
+                const SizedBox(width: 16),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Start Time',
+                      style: TextStyle(fontSize: 12, color: textVariant),
+                    ),
+                    Text(
+                      DateFormat('hh:mm a').format(startTime),
+                      style: GoogleFonts.manrope(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-          Icon(Icons.lightbulb_outline, size: 48, color: textMain.withOpacity(0.1)),
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.notifications_active,
+                color: primaryGreen.withOpacity(0.5),
+                size: 20,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Reminders every 4 hours until the bottle is full.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: textVariant,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (extendsNextDay) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.amber.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.amber.withOpacity(0.4)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.nightlight_round,
+                    color: Colors.amber,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Note: Your final schedule extends into the next calendar day.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.amber.shade800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
-}
 
-class HydrationProgressPainter extends CustomPainter {
-  final double progress;
-  final Color primaryColor;
-  final Color accentColor;
-  final Color trackColor;
+  Widget _buildDrunkButton(BuildContext context, int drankCups, bool canConfirmDrink, DateTime? nextSession) {
+    bool isDone = drankCups >= 5;
+    bool isDisabled = isDone || !canConfirmDrink;
 
-  HydrationProgressPainter({
-    required this.progress,
-    required this.primaryColor,
-    required this.accentColor,
-    required this.trackColor,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2;
-    final strokeWidth = 24.0;
-
-    final trackPaint = Paint()
-      ..color = trackColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth;
-    canvas.drawCircle(center, radius, trackPaint);
-
-    if (progress <= 0) return;
-
-    final progressPaint = Paint()
-      ..shader = SweepGradient(
-        colors: [primaryColor, accentColor],
-        // The SweepGradient behaves somewhat unpredictably for sweeping,
-        // so we can use stops or just let it sweep entire circle and clip it with arc.
-      )
-      // Transform local coordinate system to the rect's bounds to make sweep look logical
-      .createShader(Rect.fromCircle(center: center, radius: radius))
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
-
-    final resolvedProgress = progress.isNaN || progress.isInfinite ? 0.0 : progress;
-
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      -math.pi / 2,
-      2 * math.pi * resolvedProgress,
-      false,
-      progressPaint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
-}
-
-class _AddWaterDialog extends StatefulWidget {
-  final String session;
-  const _AddWaterDialog({required this.session});
-
-  @override
-  State<_AddWaterDialog> createState() => _AddWaterDialogState();
-}
-
-class _AddWaterDialogState extends State<_AddWaterDialog> {
-  int _amount = 250;
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text('Add Water (${widget.session})'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text('How much water did you drink?', style: TextStyle(color: HydrationScreen.textVariant)),
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              IconButton(
-                onPressed: () => setState(() => _amount = math.max(50, _amount - 50)),
-                icon: const Icon(Icons.remove_circle_outline),
+    return Column(
+      children: [
+        AnimatedOpacity(
+          duration: const Duration(milliseconds: 300),
+          opacity: isDisabled ? 0.5 : 1.0,
+          child: Container(
+            width: double.infinity,
+            height: 64,
+            decoration: BoxDecoration(
+              color: isDone ? Colors.grey.shade300 : null,
+              gradient: isDone ? null : const LinearGradient(colors: [primaryGreen, primaryMint]),
+              borderRadius: BorderRadius.circular(32),
+              boxShadow: isDone
+                  ? []
+                  : [
+                      BoxShadow(
+                        color: primaryGreen.withOpacity(0.2),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+            ),
+            child: ElevatedButton.icon(
+              onPressed: isDisabled
+                  ? null
+                  : () {
+                      HapticFeedback.lightImpact();
+                      context.read<HydrationCubit>().confirmDrink();
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                disabledBackgroundColor: Colors.transparent,
+                disabledForegroundColor: Colors.grey.shade800,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
               ),
-              Text('${_amount}ml', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-              IconButton(
-                onPressed: () => setState(() => _amount += 50),
-                icon: const Icon(Icons.add_circle_outline),
+              icon: isDone ? const Icon(Icons.check_circle) : const Icon(Icons.add_circle, color: Colors.white),
+              label: Text(
+                isDone ? 'Goal Reached!' : 'I\'ve Drunk 400ml',
+                style: TextStyle(
+                  color: isDone ? Colors.grey.shade700 : Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
               ),
-            ],
+            ),
           ),
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _presetButton(100),
-              _presetButton(250),
-              _presetButton(500),
-            ],
-          )
+        ),
+        if (!isDone && !canConfirmDrink && nextSession != null) ...[
+          const SizedBox(height: 12),
+          Text(
+            'Mốc uống nước tiếp theo: ${DateFormat('hh:mm a').format(nextSession)}',
+            style: TextStyle(color: textVariant, fontSize: 13, fontWeight: FontWeight.w600),
+          ),
         ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            context.read<HydrationCubit>().addWater(_amount, widget.session);
-            Navigator.pop(context);
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: HydrationScreen.primaryGreen,
-            foregroundColor: Colors.white,
-          ),
-          child: const Text('Add'),
-        ),
       ],
-    );
-  }
-
-  Widget _presetButton(int amt) {
-    return InkWell(
-      onTap: () => setState(() => _amount = amt),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: _amount == amt ? HydrationScreen.primaryGreen.withOpacity(0.1) : Colors.grey.shade100,
-          border: Border.all(
-            color: _amount == amt ? HydrationScreen.primaryGreen : Colors.transparent,
-          ),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text('${amt}ml'),
-      ),
     );
   }
 }
@@ -490,10 +578,15 @@ class _AddWaterDialogState extends State<_AddWaterDialog> {
 class _HistoryModal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF101822) : const Color(0xFFF7F9FB);
+    final textM = isDark ? Colors.white : const Color(0xFF2C3437);
+    final textV = isDark ? Colors.grey[400]! : const Color(0xFF596064);
+
     return Container(
-      decoration: const BoxDecoration(
-        color: HydrationScreen.background,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: DraggableScrollableSheet(
         initialChildSize: 0.9,
@@ -511,11 +604,11 @@ class _HistoryModal extends StatelessWidget {
                 ),
               ),
               Text(
-                '7 Days History',
+                '30 Days History',
                 style: GoogleFonts.manrope(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: HydrationScreen.textMain,
+                  color: textM,
                 ),
               ),
               const SizedBox(height: 16),
@@ -526,65 +619,88 @@ class _HistoryModal extends StatelessWidget {
                       return const Center(child: Text('No history found.'));
                     }
 
-                    // Group by day
-                    final groupedLogs = <String, List<HydrationLog>>{};
-                    for (var log in state.recentLogs) {
-                      final dayStr = DateFormat('EEEE, MMM d').format(log.timestamp);
-                      if (!groupedLogs.containsKey(dayStr)) {
-                        groupedLogs[dayStr] = [];
-                      }
-                      groupedLogs[dayStr]!.add(log);
-                    }
-
                     return ListView.builder(
                       controller: controller,
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                      itemCount: groupedLogs.length,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 8,
+                      ),
+                      itemCount: state.recentLogs.length,
                       itemBuilder: (context, index) {
-                        final dayStr = groupedLogs.keys.elementAt(index);
-                        final logs = groupedLogs[dayStr]!;
-                        final totalAmt = logs.fold(0, (s, l) => s + l.amount);
+                        final log = state.recentLogs[index];
+                        final dayStr = DateFormat(
+                          'EEEE, MMM d',
+                        ).format(log.date);
+                        final totalAmt = log.currentLevel * state.waterPerCup;
+                        final percent = (log.currentLevel / 5 * 100).toInt();
 
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 12, top: 16),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(dayStr, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                  Text('${totalAmt}ml', style: const TextStyle(color: HydrationScreen.primaryGreen, fontWeight: FontWeight.bold)),
-                                ],
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF1A2737) : Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: const Border(
+                              left: BorderSide(
+                                color: _HydrationScreenState.primaryGreen,
+                                width: 4,
                               ),
                             ),
-                            ...logs.map((log) {
-                              final timeStr = DateFormat('hh:mm a').format(log.timestamp);
-                              Color borderColor = HydrationScreen.primaryGreen;
-                              if (log.session == 'Afternoon') borderColor = HydrationScreen.primaryMint;
-                              if (log.session == 'Evening') borderColor = Colors.blueAccent.shade100;
-
-                              return Container(
-                                margin: const EdgeInsets.only(bottom: 8),
-                                padding: const EdgeInsets.all(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.02),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 48,
+                                height: 48,
                                 decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border(left: BorderSide(color: borderColor, width: 4)),
+                                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFD3E4FE),
+                                  shape: BoxShape.circle,
                                 ),
-                                child: Row(
+                                child: Icon(
+                                  Icons.water_drop,
+                                  color: isDark ? Colors.blue[200] : const Color(0xFF435368),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Icon(Icons.water_drop, color: Color(0xFF435368), size: 20),
-                                    const SizedBox(width: 12),
-                                    Text('${log.amount}ml', style: const TextStyle(fontWeight: FontWeight.w600)),
-                                    const Spacer(),
-                                    Text('$timeStr • ${log.session}', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                                    Text(
+                                      dayStr,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Achieved $percent% of goal',
+                                      style: TextStyle(
+                                        color: textV,
+                                        fontSize: 13,
+                                      ),
+                                    ),
                                   ],
                                 ),
-                              );
-                            }).toList(),
-                            const Divider(height: 24),
-                          ],
+                              ),
+                              Text(
+                                '${totalAmt}ml',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: _HydrationScreenState.primaryGreen,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
                         );
                       },
                     );

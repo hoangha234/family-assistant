@@ -5,6 +5,7 @@ import '../cubit/health_dashboard_cubit.dart';
 import '../models/food_analysis_model.dart';
 import 'sleep_details_screen.dart';
 import 'hydration_screen.dart';
+import 'health_report_screen.dart';
 
 class HealthDashboardScreen extends StatelessWidget {
   const HealthDashboardScreen({super.key});
@@ -68,7 +69,7 @@ class HealthDashboardView extends StatelessWidget {
                     const SizedBox(height: 24),
                     _buildTodayHealthSummary(state, cardColor, textColor, isDarkMode),
                     const SizedBox(height: 24),
-                    _buildWeeklyOverview(cardColor, textColor, isDarkMode),
+                    _buildWeeklyOverview(context, cardColor, textColor, isDarkMode),
                   ],
                 ),
               ),
@@ -635,7 +636,7 @@ class HealthDashboardView extends StatelessWidget {
     );
   }
 
-  Widget _buildWeeklyOverview(Color cardColor, Color textColor, bool isDarkMode) {
+  Widget _buildWeeklyOverview(BuildContext context, Color cardColor, Color textColor, bool isDarkMode) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -651,12 +652,22 @@ class HealthDashboardView extends StatelessWidget {
                   color: textColor,
                 ),
               ),
-              Text(
-                "Full Report",
-                style: GoogleFonts.manrope(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: primaryColor,
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const HealthReportScreen(),
+                    ),
+                  );
+                },
+                child: Text(
+                  "Full Report",
+                  style: GoogleFonts.manrope(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: primaryColor,
+                  ),
                 ),
               ),
             ],

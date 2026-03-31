@@ -5,54 +5,46 @@ enum HydrationStatus { initial, loading, loaded, error }
 
 class HydrationState extends Equatable {
   final HydrationStatus status;
-  final List<HydrationLog> todayLogs;
-  final int totalAmountToday;
-  final int dailyGoal; // e.g., 2500 ml
+  final HydrationLog? todayPlan;
+  final List<HydrationLog> recentLogs;
   final String? errorMessage;
-  final List<HydrationLog> recentLogs; // For "View All" 7 days history
+  final int waterPerCup;
 
   const HydrationState({
     this.status = HydrationStatus.initial,
-    this.todayLogs = const [],
-    this.totalAmountToday = 0,
-    this.dailyGoal = 2500,
-    this.errorMessage,
+    this.todayPlan,
     this.recentLogs = const [],
+    this.errorMessage,
+    this.waterPerCup = 400,
   });
 
   HydrationState copyWith({
     HydrationStatus? status,
-    List<HydrationLog>? todayLogs,
-    int? totalAmountToday,
-    int? dailyGoal,
-    String? errorMessage,
+    HydrationLog? todayPlan,
     List<HydrationLog>? recentLogs,
+    String? errorMessage,
+    int? waterPerCup,
   }) {
     return HydrationState(
       status: status ?? this.status,
-      todayLogs: todayLogs ?? this.todayLogs,
-      totalAmountToday: totalAmountToday ?? this.totalAmountToday,
-      dailyGoal: dailyGoal ?? this.dailyGoal,
-      errorMessage: errorMessage ?? this.errorMessage,
+      todayPlan: todayPlan ?? this.todayPlan,
       recentLogs: recentLogs ?? this.recentLogs,
+      errorMessage: errorMessage ?? this.errorMessage,
+      waterPerCup: waterPerCup ?? this.waterPerCup,
     );
   }
 
+  int get totalAmountToday => (todayPlan?.currentLevel ?? 0) * waterPerCup;
+  int get dailyGoal => 5 * waterPerCup; // 5 cups * 400ml = 2000ml (2L)
   double get progress => (totalAmountToday / dailyGoal).clamp(0.0, 1.0);
-
-  int getAmountForSession(String session) {
-    return todayLogs
-        .where((log) => log.session == session)
-        .fold(0, (sum, log) => sum + log.amount);
-  }
+  int get currentLevel => todayPlan?.currentLevel ?? 0;
 
   @override
   List<Object?> get props => [
         status,
-        todayLogs,
-        totalAmountToday,
-        dailyGoal,
-        errorMessage,
+        todayPlan,
         recentLogs,
+        errorMessage,
+        waterPerCup,
       ];
 }

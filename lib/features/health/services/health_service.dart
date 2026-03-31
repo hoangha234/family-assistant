@@ -29,7 +29,9 @@ class HealthService {
   int _initialSteps = 0;
   int _currentSteps = 0;
   int _savedSteps = 0;
+  int _lastSavedSteps = -1;
   bool _isTracking = false;
+  Timer? _stepSaveTimer;
 
   HealthService({AIService? aiService}) : _aiService = aiService ?? AIService();
 
@@ -119,10 +121,8 @@ class HealthService {
           debugPrint('[HealthService] Current: $_currentSteps (saved: $_savedSteps + new: $stepsSinceAppStart)');
           _stepController.add(_currentSteps);
 
-          // Auto-save every 50 steps
-          if (stepsSinceAppStart > 0 && stepsSinceAppStart % 50 == 0) {
-            updateHealthData(steps: _currentSteps);
-          }
+          // Schedule save
+          _scheduleStepSave();
         },
         onError: (error) {
           debugPrint('[HealthService] ❌ Pedometer error: $error');
@@ -143,11 +143,23 @@ class HealthService {
     debugPrint('[HealthService] Stopping step tracking...');
     _pedometerSubscription?.cancel();
     _pedometerSubscription = null;
+    _stepSaveTimer?.cancel();
     _isTracking = false;
 
-    if (_currentSteps > 0) {
+    if (_currentSteps > 0 && _currentSteps != _lastSavedSteps) {
       updateHealthData(steps: _currentSteps);
+      _lastSavedSteps = _currentSteps;
     }
+  }
+
+  void _scheduleStepSave() {
+    if (_stepSaveTimer?.isActive ?? false) return;
+    _stepSaveTimer = Timer(const Duration(seconds: 10), () {
+      if (_currentSteps != _lastSavedSteps && _currentSteps > 0) {
+        updateHealthData(steps: _currentSteps);
+        _lastSavedSteps = _currentSteps;
+      }
+    });
   }
 
   int get currentSteps => _currentSteps;
@@ -381,9 +393,10 @@ class HealthService {
     int? carbs,
     int? fat,
     int? activityMinutes,
+    DateTime? date,
   }) async {
     try {
-      final dateString = _formatDate(DateTime.now());
+      final dateString = _formatDate(date ?? DateTime.now());
       final updates = <String, dynamic>{
         'date': dateString,
         'updatedAt': FieldValue.serverTimestamp(),
@@ -403,6 +416,32 @@ class HealthService {
     } catch (e) {
       debugPrint('[HealthService] Error updating: $e');
       throw HealthServiceException('Failed to update health data: $e');
+    }
+  }
+
+  /// Add nutrition to a specific date (reads current and adds)
+  Future<void> addNutritionForDate(DateTime date, int addedCalories, int addedProtein) async {
+    try {
+      final dateString = _formatDate(date);
+      final doc = await _healthCollection.doc(dateString).get();
+      int currentCal = 0;
+      int currentPro = 0;
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data()!;
+        currentCal = (data['calories'] as num?)?.toInt() ?? 0;
+        currentPro = (data['protein'] as num?)?.toInt() ?? 0;
+      }
+      
+      final updatedCalories = (currentCal + addedCalories).clamp(0, 99999);
+      final updatedProtein = (currentPro + addedProtein).clamp(0, 9999);
+      
+      await updateHealthData(
+        date: date,
+        calories: updatedCalories,
+        protein: updatedProtein,
+      );
+    } catch (e) {
+      debugPrint('[HealthService] Error adding nutrition for date: $e');
     }
   }
 

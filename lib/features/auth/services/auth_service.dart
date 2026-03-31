@@ -1,3 +1,6 @@
+import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/foundation.dart';
@@ -50,6 +53,72 @@ class AuthService {
   /// Stream of auth state changes
   Stream<User?> get authStateChanges => _firebaseAuth.authStateChanges();
 
+  /// Fetch user gender from Firestore
+  Future<String?> getUserGender(String uid) async {
+    try {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      if (doc.exists) {
+        return doc.data()?['gender'] as String?;
+      }
+    } catch (e) {
+      debugPrint('[AuthService] Error fetching gender: $e');
+    }
+    return null;
+  }
+
+  /// Update user profile
+  Future<void> updateUserProfile({
+    String? displayName,
+    File? avatarFile,
+    String? gender,
+  }) async {
+    final user = _firebaseAuth.currentUser;
+    if (user == null) {
+      throw AuthServiceException('No user logged in.');
+    }
+
+    String? photoUrl = user.photoURL;
+
+    // Upload avatar if provided
+    if (avatarFile != null) {
+      try {
+        final ref = FirebaseStorage.instance.ref().child('avatars/${user.uid}.jpg');
+        await ref.putFile(avatarFile);
+        photoUrl = await ref.getDownloadURL();
+      } catch (e) {
+        debugPrint('[AuthService] Failed to upload avatar: $e');
+        throw AuthServiceException('Failed to upload image. Please try again.');
+      }
+    }
+
+    // Update Firebase Auth Profile
+    if (displayName != null || photoUrl != user.photoURL) {
+      try {
+        await user.updateDisplayName(displayName);
+        if (photoUrl != user.photoURL) {
+          await user.updatePhotoURL(photoUrl);
+        }
+      } catch (e) {
+        throw AuthServiceException('Failed to update auth profile.');
+      }
+    }
+
+    // Update gender in Firestore
+    if (gender != null) {
+      try {
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'gender': gender,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      } catch (e) {
+        throw AuthServiceException('Failed to save additional profile details.');
+      }
+    }
+
+    // Refresh user object
+    await user.reload();
+  }
+
   /// Login with email and password
   Future<UserModel> loginWithEmailAndPassword({
     required String email,
@@ -68,7 +137,8 @@ class AuthService {
         throw AuthServiceException('Login failed: No user returned');
       }
 
-      return UserModel.fromFirebaseUser(credential.user!);
+      final gender = await getUserGender(credential.user!.uid);
+      return UserModel.fromFirebaseUser(credential.user!, gender: gender);
     } on FirebaseAuthException catch (e) {
       debugPrint('[AuthService] FirebaseAuthException: ${e.code} - ${e.message}');
       throw AuthServiceException(
@@ -101,13 +171,13 @@ class AuthService {
         throw AuthServiceException('Registration failed: No user returned');
       }
 
-      // Update display name if provided
       if (displayName != null && displayName.isNotEmpty) {
         await credential.user!.updateDisplayName(displayName);
         debugPrint('[AuthService] Display name updated to: $displayName');
       }
 
-      return UserModel.fromFirebaseUser(credential.user!);
+      final gender = await getUserGender(credential.user!.uid);
+      return UserModel.fromFirebaseUser(credential.user!, gender: gender);
     } on FirebaseAuthException catch (e) {
       debugPrint('[AuthService] FirebaseAuthException: ${e.code} - ${e.message}');
       throw AuthServiceException(
@@ -149,7 +219,8 @@ class AuthService {
         throw AuthServiceException('Google login failed: No user returned');
       }
 
-      return UserModel.fromFirebaseUser(userCredential.user!);
+      final gender = await getUserGender(userCredential.user!.uid);
+      return UserModel.fromFirebaseUser(userCredential.user!, gender: gender);
     } on FirebaseAuthException catch (e) {
       throw AuthServiceException(
         _getErrorMessage(e.code),

@@ -50,7 +50,7 @@ class HealthDashboardState extends Equatable {
     this.sleepHours = 6.75,
     this.sleepGoal = 8.0,
     this.waterLiters = 1.5,
-    this.waterGoal = 2.5,
+    this.waterGoal = 2.0,
     this.dailyCalories = 0,
     this.caloriesGoal = 2200,
     this.protein = 0,

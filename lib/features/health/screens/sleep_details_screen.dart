@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:fl_chart/fl_chart.dart';
 import '../cubit/sleep_cubit.dart';
 import '../cubit/sleep_state.dart';
+import '../models/sleep_data_model.dart';
 
 class SleepDetailsScreen extends StatelessWidget {
   const SleepDetailsScreen({super.key});
@@ -27,10 +29,12 @@ class _SleepDetailsView extends StatefulWidget {
 class _SleepDetailsViewState extends State<_SleepDetailsView> {
   static const Color primaryGreen = Color(0xFF006E36);
   static const Color primaryMint = Color(0xFF6DFE9C);
-  static const Color background = Color(0xFFF7F9FB);
-  static const Color surfaceWhite = Colors.white;
-  static const Color textMain = Color(0xFF2C3437);
-  static const Color textVariant = Color(0xFF596064);
+
+  bool get isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get background => isDark ? const Color(0xFF101822) : const Color(0xFFF7F9FB);
+  Color get surfaceWhite => isDark ? const Color(0xFF1A2737) : Colors.white;
+  Color get textMain => isDark ? Colors.white : const Color(0xFF2C3437);
+  Color get textVariant => isDark ? Colors.grey[400]! : const Color(0xFF596064);
 
   bool _dialogShown = false;
 
@@ -122,8 +126,8 @@ class _SleepDetailsViewState extends State<_SleepDetailsView> {
         final durationText = data?.formattedSleepDuration ?? '0h 00m';
         final qualityTag = data?.qualityTag ?? 'No Data';
 
-        final bedtimeText = data != null ? DateFormat('h:mm a').format(data.bedtime) : '--:--';
-        final wakeupText = data != null ? DateFormat('h:mm a').format(data.wakeup) : '--:--';
+        final bedtimeText = data != null ? DateFormat('HH:mm').format(data.bedtime) : '--:--';
+        final wakeupText = data != null ? DateFormat('HH:mm').format(data.wakeup) : '--:--';
 
         return Scaffold(
           backgroundColor: background,
@@ -135,13 +139,15 @@ class _SleepDetailsViewState extends State<_SleepDetailsView> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildHeroCard(durationText, qualityTag),
+                      _buildHeroCard(durationText, qualityTag, state.history7Days),
                       const SizedBox(height: 32),
-                      _buildSleepStagesSection(),
+                      _buildSleepStagesSection(state),
                       const SizedBox(height: 32),
                       _buildDataGrid(bedtimeText, wakeupText),
                       const SizedBox(height: 32),
                       _buildActionButton(context),
+                      const SizedBox(height: 32),
+                      _buildSleepHistorySection(state.history30Days),
                       const SizedBox(height: 40),
                     ],
                   ),
@@ -169,15 +175,27 @@ class _SleepDetailsViewState extends State<_SleepDetailsView> {
       ),
       centerTitle: true,
       actions: [
-        IconButton(
+        PopupMenuButton<String>(
           icon: const Icon(Icons.settings, color: primaryGreen),
-          onPressed: () {},
+          onSelected: (value) {
+            if (value == 'delete') {
+              context.read<SleepCubit>().deleteTodayData();
+            }
+          },
+          itemBuilder: (BuildContext context) {
+            return [
+              const PopupMenuItem<String>(
+                value: 'delete',
+                child: Text('Delete today\'s data'),
+              ),
+            ];
+          },
         ),
       ],
     );
   }
 
-  Widget _buildHeroCard(String durationText, String qualityTag) {
+  Widget _buildHeroCard(String durationText, String qualityTag, List<SleepData> history7Days) {
     return Container(
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
@@ -217,7 +235,7 @@ class _SleepDetailsViewState extends State<_SleepDetailsView> {
               color: textMain,
             ),
           ),
-          const Text(
+          Text(
             'Time Asleep',
             style: TextStyle(color: textVariant, fontWeight: FontWeight.w500),
           ),
@@ -227,15 +245,19 @@ class _SleepDetailsViewState extends State<_SleepDetailsView> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _bar(0.4, Colors.grey.withOpacity(0.1)),
-                _bar(0.7, primaryGreen.withOpacity(0.2)),
-                _bar(0.9, primaryGreen.withOpacity(0.4)),
-                _bar(0.5, primaryGreen.withOpacity(0.6)),
-                _bar(0.8, primaryMint),
-                _bar(1.0, primaryGreen),
-                _bar(0.6, const Color(0xFF00602F)),
-              ],
+              children: List.generate(7, (index) {
+                final dataIndex = index - (7 - history7Days.length);
+                if (dataIndex < 0) {
+                  return _bar(0.05, Colors.grey.withOpacity(0.1));
+                }
+                final data = history7Days[dataIndex];
+                final duration = data.wakeup.difference(data.bedtime);
+                final factor = (duration.inMinutes / 600).clamp(0.05, 1.0);
+                
+                final isToday = dataIndex == history7Days.length - 1;
+                final color = isToday ? primaryGreen : primaryMint.withOpacity(0.8);
+                return _bar(factor, color);
+              }),
             ),
           ),
         ],
@@ -256,7 +278,7 @@ class _SleepDetailsViewState extends State<_SleepDetailsView> {
     );
   }
 
-  Widget _buildSleepStagesSection() {
+  Widget _buildSleepStagesSection(SleepState state) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -271,7 +293,7 @@ class _SleepDetailsViewState extends State<_SleepDetailsView> {
                 color: textMain,
               ),
             ),
-            const Text(
+            Text(
               'Last Night',
               style: TextStyle(fontSize: 12, color: textVariant),
             ),
@@ -293,9 +315,41 @@ class _SleepDetailsViewState extends State<_SleepDetailsView> {
                   color: background,
                   borderRadius: BorderRadius.circular(24),
                 ),
-                child: Center(
-                  child: Text("Area Chart Placeholder", 
-                    style: TextStyle(color: textVariant.withOpacity(0.5))),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: LineChart(
+                    LineChartData(
+                      gridData: FlGridData(show: false),
+                      titlesData: FlTitlesData(show: false),
+                      borderData: FlBorderData(show: false),
+                      minX: 0,
+                      maxX: 6,
+                      minY: 0,
+                      maxY: 6,
+                      lineBarsData: [
+                        LineChartBarData(
+                          spots: const [
+                            FlSpot(0, 5),
+                            FlSpot(1, 1),
+                            FlSpot(2, 4),
+                            FlSpot(3, 2),
+                            FlSpot(4, 5),
+                            FlSpot(5, 1),
+                            FlSpot(6, 6),
+                          ],
+                          isCurved: true,
+                          color: primaryMint,
+                          barWidth: 3,
+                          isStrokeCapRound: true,
+                          dotData: FlDotData(show: false),
+                          belowBarData: BarAreaData(
+                            show: true,
+                            color: primaryGreen.withOpacity(0.2),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 24),
@@ -305,10 +359,10 @@ class _SleepDetailsViewState extends State<_SleepDetailsView> {
                 crossAxisCount: 2,
                 childAspectRatio: 2.5,
                 children: [
-                  _legendItem('Deep Sleep', '--', primaryGreen),
-                  _legendItem('REM Sleep', '--', primaryMint),
-                  _legendItem('Light Sleep', '--', Colors.grey.shade300),
-                  _legendItem('Awake', '--', const Color(0xFFD3E4FE)),
+                  _legendItem('Deep Sleep', state.deepSleepFormatted, primaryGreen),
+                  _legendItem('REM Sleep', state.remSleepFormatted, primaryMint),
+                  _legendItem('Light Sleep', state.lightSleepFormatted, Colors.grey.shade300),
+                  _legendItem('Awake', state.awakeFormatted, isDark ? const Color(0xFF0F172A) : const Color(0xFFD3E4FE)),
                 ],
               ),
             ],
@@ -332,7 +386,7 @@ class _SleepDetailsViewState extends State<_SleepDetailsView> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-            Text(time, style: const TextStyle(fontSize: 10, color: textVariant)),
+            Text(time, style: TextStyle(fontSize: 10, color: textVariant)),
           ],
         ),
       ],
@@ -355,14 +409,14 @@ class _SleepDetailsViewState extends State<_SleepDetailsView> {
       decoration: BoxDecoration(
         color: surfaceWhite,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.6)),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : Colors.white.withOpacity(0.6)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, color: primaryGreen, size: 24),
           const SizedBox(height: 8),
-          Text(title, style: const TextStyle(fontSize: 12, color: textVariant)),
+          Text(title, style: TextStyle(fontSize: 12, color: textVariant)),
           Text(
             time,
             style: GoogleFonts.manrope(fontSize: 18, fontWeight: FontWeight.bold),
@@ -409,4 +463,104 @@ class _SleepDetailsViewState extends State<_SleepDetailsView> {
       ),
     );
   }
+
+  Widget _buildSleepHistorySection(List<SleepData> history) {
+    if (history.isEmpty) return const SizedBox();
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Sleep History (Past 30 Days)',
+          style: GoogleFonts.manrope(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: textMain,
+          ),
+        ),
+        const SizedBox(height: 16),
+        ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: history.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            final data = history[index];
+            final dateText = DateFormat('dd MMM').format(data.date);
+            final durationText = data.formattedSleepDuration;
+            final qualityTag = data.qualityTag;
+            
+            final duration = data.wakeup.difference(data.bedtime);
+            final hours = duration.inMinutes / 60;
+            
+            final isGood = qualityTag.toLowerCase().contains('good');
+            final color = isGood ? primaryGreen : Colors.grey;
+
+            return Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: surfaceWhite,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 60,
+                    child: Text(
+                      dateText,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: textVariant,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          durationText,
+                          style: GoogleFonts.manrope(
+                            fontWeight: FontWeight.bold,
+                            color: textMain,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: (hours / 10).clamp(0.0, 1.0),
+                            backgroundColor: Colors.grey.withOpacity(0.1),
+                            color: color,
+                            minHeight: 6,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      qualityTag == 'N/A' ? 'No Data' : qualityTag,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: color,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
 }
+

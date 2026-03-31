@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/hydration_log_model.dart';
+import 'notification_service.dart';
 
 class HydrationService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -15,69 +16,130 @@ class HydrationService {
     return _firestore.collection('users').doc(uid).collection('health_logs');
   }
 
-  /// Add a water intake log
-  Future<void> addWaterLog(int amount, String session) async {
-    try {
-      final now = DateTime.now();
-      final startOfDay = DateTime(now.year, now.month, now.day);
-      final log = HydrationLog(
-        id: '',
-        amount: amount,
-        timestamp: now,
-        session: session,
+  /// Helper to get the start of the day
+  DateTime _getStartOfDay(DateTime time) {
+    return DateTime(time.year, time.month, time.day);
+  }
+
+  /// Check if a log exists for today. If not, create an empty one.
+  Future<HydrationLog> getOrCreateTodayPlan() async {
+    final now = DateTime.now();
+    final startOfDay = _getStartOfDay(now);
+
+    final snapshot = await _healthLogsRef
+        .where('type', isEqualTo: 'hydration')
+        .where('date', isEqualTo: Timestamp.fromDate(startOfDay))
+        .limit(1)
+        .get();
+
+    if (snapshot.docs.isNotEmpty) {
+      final doc = snapshot.docs.first;
+      return HydrationLog.fromMap(doc.data() as Map<String, dynamic>, doc.id);
+    } else {
+      final defaultStartTime = DateTime(now.year, now.month, now.day, 7, 0);
+      final defaultSessions = List.generate(
+        5,
+        (index) => defaultStartTime.add(Duration(hours: index * 4)),
       );
-      final mapData = log.toMap();
-      mapData['date'] = Timestamp.fromDate(startOfDay); // Add 'date' field for simple indexed queries
+
+      final newPlan = HydrationLog(
+        id: '',
+        date: startOfDay,
+        startTime: defaultStartTime,
+        sessions: defaultSessions,
+        currentLevel: 0,
+      );
+
+      final docRef = await _healthLogsRef.add(newPlan.toMap());
       
-      await _healthLogsRef.add(mapData);
-    } catch (e) {
-      debugPrint('[HydrationService] Error adding water log: $e');
-      throw Exception('Failed to add water log: $e');
+      // Schedule notifications for the new day
+      await NotificationService.scheduleHydrationReminders(defaultSessions);
+
+      return HydrationLog(
+        id: docRef.id,
+        date: newPlan.date,
+        startTime: newPlan.startTime,
+        sessions: newPlan.sessions,
+        currentLevel: newPlan.currentLevel,
+      );
     }
   }
 
-  /// Stream today's hydration logs
-  Stream<List<HydrationLog>> streamTodayLogs() {
+  /// Stream today's hydration plan
+  Stream<HydrationLog?> streamTodayPlan() {
     final uid = _userId;
     if (uid == null) return const Stream.empty();
 
     final now = DateTime.now();
-    final startOfDay = DateTime(now.year, now.month, now.day);
+    final startOfDay = _getStartOfDay(now);
 
     return _healthLogsRef
         .where('type', isEqualTo: 'hydration')
         .where('date', isEqualTo: Timestamp.fromDate(startOfDay))
+        .limit(1)
         .snapshots()
         .map((snapshot) {
-      final logs = snapshot.docs
-          .map((doc) => HydrationLog.fromMap(doc.data() as Map<String, dynamic>, doc.id))
-          .toList();
-      logs.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-      return logs;
+      if (snapshot.docs.isEmpty) return null;
+      final doc = snapshot.docs.first;
+      return HydrationLog.fromMap(doc.data() as Map<String, dynamic>, doc.id);
     });
   }
 
-  /// Get logs for the last 7 days (for "View All" feature)
+  /// Update the current hydration level
+  Future<void> updateCurrentLevel(String id, int newLevel) async {
+    try {
+      await _healthLogsRef.doc(id).update({'currentLevel': newLevel});
+    } catch (e) {
+      debugPrint('[HydrationService] Error updating level: $e');
+      throw Exception('Failed to update water level: $e');
+    }
+  }
+
+  /// Update the start time and recalculate sessions
+  Future<void> updateStartTime(String id, DateTime newStartTime) async {
+    try {
+      final sessions = List.generate(
+        5,
+        (index) => newStartTime.add(Duration(hours: index * 4)),
+      );
+
+      final updates = <String, dynamic>{
+        'startTime': Timestamp.fromDate(newStartTime),
+        'sessions': sessions.map((e) => Timestamp.fromDate(e)).toList(),
+        'currentLevel': 0,
+      };
+
+      await _healthLogsRef.doc(id).update(updates);
+
+      // Reschedule notifications
+      await NotificationService.scheduleHydrationReminders(sessions);
+    } catch (e) {
+      debugPrint('[HydrationService] Error updating start time: $e');
+      throw Exception('Failed to update start time: $e');
+    }
+  }
+
+  /// Get logs for the last 30 days
   Future<List<HydrationLog>> getRecentLogs() async {
     try {
       final uid = _userId;
       if (uid == null) return [];
 
       final now = DateTime.now();
-      final startOfDay = DateTime(now.year, now.month, now.day);
-      final sevenDaysAgo = startOfDay.subtract(const Duration(days: 6)); // Including today, 7 days total
+      final startOfDay = _getStartOfDay(now);
+      final thirtyDaysAgo = startOfDay.subtract(const Duration(days: 29));
       final endOfDay = startOfDay.add(const Duration(days: 1));
 
       final snapshot = await _healthLogsRef
           .where('type', isEqualTo: 'hydration')
-          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(sevenDaysAgo))
+          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(thirtyDaysAgo))
           .where('date', isLessThan: Timestamp.fromDate(endOfDay))
           .get();
 
       final logs = snapshot.docs
           .map((doc) => HydrationLog.fromMap(doc.data() as Map<String, dynamic>, doc.id))
           .toList();
-      logs.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      logs.sort((a, b) => b.date.compareTo(a.date)); // Sort latest first
       return logs;
     } catch (e) {
       debugPrint('[HydrationService] Error getting recent logs: $e');

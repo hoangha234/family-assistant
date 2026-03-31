@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -23,10 +24,11 @@ class AuthCubit extends Cubit<AuthState> {
   void initialize() {
     debugPrint('[AuthCubit] Initializing...');
     _authSubscription?.cancel();
-    _authSubscription = _authService.authStateChanges.listen((user) {
+    _authSubscription = _authService.authStateChanges.listen((user) async {
       debugPrint('[AuthCubit] Auth state changed: ${user?.email ?? "null"}');
       if (user != null) {
-        emit(AuthState.authenticated(UserModel.fromFirebaseUser(user)));
+        final gender = await _authService.getUserGender(user.uid);
+        emit(AuthState.authenticated(UserModel.fromFirebaseUser(user, gender: gender)));
       } else {
         emit(const AuthState.unauthenticated());
       }
@@ -135,6 +137,35 @@ class AuthCubit extends Cubit<AuthState> {
       emit(const AuthState.unauthenticated());
     } catch (e) {
       emit(AuthState.error('Sign out failed. Please try again.'));
+    }
+  }
+
+  /// Update profile information
+  Future<void> updateProfile({
+    String? displayName,
+    File? avatarFile,
+    String? gender,
+  }) async {
+    try {
+      emit(const AuthState.loading());
+      await _authService.updateUserProfile(
+        displayName: displayName,
+        avatarFile: avatarFile,
+        gender: gender,
+      );
+
+      final currentUser = _authService.currentUser;
+      if (currentUser != null) {
+        final updatedGender = await _authService.getUserGender(currentUser.uid);
+        emit(AuthState.authenticated(UserModel.fromFirebaseUser(currentUser, gender: updatedGender)));
+      } else {
+        emit(const AuthState.unauthenticated());
+      }
+    } on AuthServiceException catch (e) {
+      emit(AuthState.error(e.message));
+    } catch (e) {
+      debugPrint('[AuthCubit] Update profile error: $e');
+      emit(AuthState.error('Failed to update profile.'));
     }
   }
 

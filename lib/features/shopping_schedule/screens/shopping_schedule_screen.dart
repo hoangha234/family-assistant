@@ -18,13 +18,21 @@ class ShoppingScheduleScreen extends StatelessWidget {
   }
 }
 
-class ShoppingScheduleView extends StatelessWidget {
+class ShoppingScheduleView extends StatefulWidget {
   const ShoppingScheduleView({super.key});
 
+  @override
+  State<ShoppingScheduleView> createState() => _ShoppingScheduleViewState();
+}
+
+class _ShoppingScheduleViewState extends State<ShoppingScheduleView> {
+  bool get isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get bgLight => isDark ? const Color(0xFF101822) : const Color(0xFFF8F9FA);
+  Color get textDark => isDark ? Colors.white : const Color(0xFF111518);
+  Color get textMuted => isDark ? Colors.grey[400]! : const Color(0xFF60798A);
+  Color get cardBg => isDark ? const Color(0xFF1A2737) : Colors.white;
+  Color get dividerColor => isDark ? const Color(0xFF334155) : Colors.grey.shade100;
   static const Color primaryColor = Color(0xFF0B84DA);
-  static const Color bgLight = Color(0xFFF8F9FA);
-  static const Color textDark = Color(0xFF111518);
-  static const Color textMuted = Color(0xFF60798A);
 
   @override
   Widget build(BuildContext context) {
@@ -112,7 +120,7 @@ class ShoppingScheduleView extends StatelessWidget {
             onTap: () => Navigator.pop(context),
             child: Row(
               children: [
-                const Icon(Icons.chevron_left, size: 28, color: textDark),
+                Icon(Icons.chevron_left, size: 28, color: textDark),
                 const SizedBox(width: 4),
                 Text(
                   'Back',
@@ -145,7 +153,7 @@ class ShoppingScheduleView extends StatelessWidget {
       height: 48,
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: Colors.grey[200],
+        color: isDark ? const Color(0xFF202C39) : Colors.grey[200],
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -163,7 +171,7 @@ class ShoppingScheduleView extends StatelessWidget {
         onTap: () => context.read<ShoppingScheduleCubit>().setTab(index),
         child: Container(
           decoration: BoxDecoration(
-            color: isSelected ? Colors.white : Colors.transparent,
+            color: isSelected ? (isDark ? const Color(0xFF334155) : Colors.white) : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
             boxShadow: isSelected
                 ? [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 2)]
@@ -272,12 +280,12 @@ class ShoppingScheduleView extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardBg,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: schedule.status == ScheduleStatus.failed
               ? Colors.red.withValues(alpha: 0.3)
-              : Colors.grey.shade100,
+              : dividerColor,
         ),
         boxShadow: [
           BoxShadow(

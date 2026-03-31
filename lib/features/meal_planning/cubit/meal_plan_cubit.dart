@@ -5,6 +5,7 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
 import '../models/meal_model.dart';
 import '../services/meal_service.dart';
+import '../../health/services/health_service.dart';
 
 part 'meal_plan_state.dart';
 
@@ -100,7 +101,7 @@ class MealPlanCubit extends Cubit<MealPlanState> {
     emit(state.copyWith(selectedMealType: type));
   }
 
-  /// Generate meal suggestion (recipe and image) from AI
+  /// Generate 1-meal suggestion (with daily constraints in mind)
   Future<void> getMealSuggestion(String ingredients) async {
     if (ingredients.trim().isEmpty) {
       emit(state.copyWith(
@@ -118,13 +119,11 @@ class MealPlanCubit extends Cubit<MealPlanState> {
     ));
 
     try {
-      // MealService will handle generating the recipe AND the image.
       final mealSuggestion = await _mealService.generateMealFromAI(
         ingredients,
         mealType: state.selectedMealType ?? MealType.lunch,
       );
 
-      // Emit the final state with the complete MealModel (including image bytes)
       emit(state.copyWith(
         status: MealPlanStatus.loaded,
         isGenerating: false,
@@ -166,6 +165,18 @@ class MealPlanCubit extends Cubit<MealPlanState> {
       // Sort meals by type order
       updatedMeals.sort((a, b) => a.type.index.compareTo(b.type.index));
 
+      // Add nutrition to Health Dashboard
+      try {
+        final healthService = HealthService();
+        await healthService.addNutritionForDate(
+          state.selectedDate,
+          mealToSave.calories,
+          mealToSave.protein,
+        );
+      } catch (e) {
+        debugPrint('[MealPlanCubit] Failed to add health data: $e');
+      }
+
       emit(state.copyWith(
         meals: updatedMeals,
         isSaving: false,
@@ -183,13 +194,50 @@ class MealPlanCubit extends Cubit<MealPlanState> {
   /// Delete a meal from selected date
   Future<void> deleteMeal(MealType mealType) async {
     try {
+      // Find the meal being deleted to subtract its nutrition
+      final deletedMeal = state.meals.firstWhere(
+        (m) => m.type == mealType,
+        orElse: () => MealModel(
+          id: '',
+          name: '',
+          description: '',
+          type: mealType,
+          calories: 0,
+          protein: 0,
+          carbs: 0,
+          fats: 0,
+          ingredients: [],
+          instructions: [],
+          imageUrl: '',
+          date: state.selectedDate,
+          createdAt: DateTime.now(),
+        ),
+      );
+
       await _mealService.deleteMealFromDate(mealType, state.selectedDate);
+
+      // Subtract nutrition from Health Dashboard
+      if (deletedMeal.calories > 0 || deletedMeal.protein > 0) {
+        try {
+          final healthService = HealthService();
+          await healthService.addNutritionForDate(
+            state.selectedDate,
+            -deletedMeal.calories,
+            -deletedMeal.protein,
+          );
+        } catch (e) {
+          debugPrint('[MealPlanCubit] Failed to subtract health data: $e');
+        }
+      }
 
       final updatedMeals = state.meals.where((m) => m.type != mealType).toList();
       emit(state.copyWith(meals: updatedMeals));
+
     } catch (e) {
       debugPrint('[MealPlanCubit] Error deleting meal: $e');
-      emit(state.copyWith(errorMessage: 'Failed to delete meal'));
+      emit(state.copyWith(
+        errorMessage: 'Failed to delete meal',
+      ));
     }
   }
 

@@ -70,11 +70,6 @@ class HealthDashboardCubit extends Cubit<HealthDashboardState> {
         (steps) {
           debugPrint('[HealthDashboardCubit] Steps updated: $steps');
           emit(state.copyWith(steps: steps));
-
-          // Save to Firestore periodically (every 100 steps)
-          if (steps % 100 == 0 && steps > 0) {
-            _saveStepsToFirestore(steps);
-          }
         },
         onError: (error) {
           debugPrint('[HealthDashboardCubit] Step tracking error: $error');
@@ -84,15 +79,6 @@ class HealthDashboardCubit extends Cubit<HealthDashboardState> {
       debugPrint('[HealthDashboardCubit] Step tracking started');
     } catch (e) {
       debugPrint('[HealthDashboardCubit] Error starting step tracking: $e');
-    }
-  }
-
-  /// Save current steps to Firestore
-  Future<void> _saveStepsToFirestore(int steps) async {
-    try {
-      await _healthService.updateHealthData(steps: steps);
-    } catch (e) {
-      debugPrint('[HealthDashboardCubit] Error saving steps: $e');
     }
   }
 

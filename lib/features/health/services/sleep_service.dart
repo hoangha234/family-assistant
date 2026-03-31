@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/sleep_data_model.dart';
+import 'health_service.dart';
 
 class SleepService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -68,6 +69,12 @@ class SleepService {
         );
         await _healthLogsRef.add(newData.toMap());
       }
+
+      // Sync sleep hours to HealthDashboard
+      final duration = wakeup.difference(bedtime);
+      final hours = duration.inMinutes / 60.0;
+      await HealthService().updateHealthData(sleepHours: hours);
+
     } catch (e) {
       debugPrint('[SleepService] Error saving schedule: $e');
       throw Exception('Failed to save sleep schedule: $e');
@@ -84,6 +91,57 @@ class SleepService {
     } catch (e) {
       debugPrint('[SleepService] Error confirming sleep: $e');
       throw Exception('Failed to confirm sleep quality: $e');
+    }
+  }
+
+  /// Load sleep history for the past [days] days
+  Future<List<SleepData>> loadSleepHistory({int days = 30}) async {
+    try {
+      final uid = _userId;
+      if (uid == null) return [];
+
+      final now = DateTime.now();
+      final startDate = DateTime(now.year, now.month, now.day).subtract(Duration(days: days));
+
+      final snapshot = await _healthLogsRef
+          .where('type', isEqualTo: 'sleep')
+          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+          .orderBy('date', descending: true)
+          .get();
+
+      return snapshot.docs.map((doc) {
+        return SleepData.fromMap(doc.data() as Map<String, dynamic>, doc.id);
+      }).toList();
+    } catch (e) {
+      debugPrint('[SleepService] Error loading sleep history: $e');
+      return [];
+    }
+  }
+
+  /// Delete today's sleep data (for testing)
+  Future<void> deleteTodayData() async {
+    try {
+      final uid = _userId;
+      if (uid == null) return;
+
+      final now = DateTime.now();
+      final startOfDay = DateTime(now.year, now.month, now.day);
+      final endOfDay = startOfDay.add(const Duration(days: 1));
+
+      final querySnapshot = await _healthLogsRef
+          .where('type', isEqualTo: 'sleep')
+          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+          .where('date', isLessThan: Timestamp.fromDate(endOfDay))
+          .get();
+
+      for (var doc in querySnapshot.docs) {
+        await doc.reference.delete();
+      }
+
+      // Sync removal to HealthDashboard
+      await HealthService().updateHealthData(sleepHours: 0.0);
+    } catch (e) {
+      debugPrint('[SleepService] Error deleting today data: $e');
     }
   }
 }
