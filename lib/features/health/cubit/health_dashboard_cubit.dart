@@ -25,7 +25,7 @@ class HealthDashboardCubit extends Cubit<HealthDashboardState> {
   HealthDashboardCubit({
     HealthService? healthService,
     ImagePicker? imagePicker,
-  })  : _healthService = healthService ?? HealthService(),
+  })  : _healthService = healthService ?? HealthService.instance(),
         _imagePicker = imagePicker ?? ImagePicker(),
         super(const HealthDashboardState()) {
     _init();
@@ -282,9 +282,12 @@ class HealthDashboardCubit extends Cubit<HealthDashboardState> {
 
   @override
   Future<void> close() {
-    stopStepTracking();
+    // Only cancel local subscriptions
+    // Do NOT stop step tracking or dispose HealthService
+    // because the singleton service should keep running across screens
+    _stepSubscription?.cancel();
+    _stepSubscription = null;
     _healthDataSubscription?.cancel();
-    _healthService.dispose();
     return super.close();
   }
 }

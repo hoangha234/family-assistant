@@ -33,6 +33,20 @@ class HealthService {
   bool _isTracking = false;
   Timer? _stepSaveTimer;
 
+  /// Singleton instance
+  static HealthService? _instance;
+
+  /// Get or create the singleton instance
+  /// Use this for app-level step tracking that persists across screens
+  factory HealthService.instance() {
+    _instance ??= HealthService._internal(AIService());
+    return _instance!;
+  }
+
+  /// Internal constructor for singleton
+  HealthService._internal(this._aiService);
+
+  /// Public constructor for backwards compatibility and testing
   HealthService({AIService? aiService}) : _aiService = aiService ?? AIService();
 
   // ==================== STEP TRACKING ====================

@@ -90,20 +90,18 @@ class MealService {
 
   /// System prompt for AI meal generation
   static const String _mealGenerationPrompt = '''
-You are a professional nutritionist and chef AI assistant.
-Your task is to generate a healthy meal recipe based on the ingredients provided by the user.
+You are a professional nutrition expert and chef integrated into the "Family Assistant" app.
+Your task is to design a meal recipe based strictly on the ingredients provided by the user.
 
 STRICT RULES:
 1. Use primarily the ingredients provided by the user.
 2. You may add minimal common pantry items (salt, oil, pepper, water, basic spices).
-You are a professional nutrition expert and chef integrated into the "Family Assistant" app.
-Your task is to design a meal based strictly on the ingredients provided by the user (basic spices can be added).
 
 CRITICAL CONTEXT & DAILY BUDGET:
-The user has a STRICT daily limit of <= 2200 kcal and <= 120g protein across ALL 3 MEALS. 
-You must psychologically allocate these limits for Breakfast, Lunch, and Dinner. 
+The total daily target for ALL 3 MEALS combined must be EXACTLY 2000 kcal (with an allowed margin of error of +/- 150 kcal, meaning the total should strictly fall between 1850 and 2150 kcal) and exactly 120g of protein.
+You must logically allocate these limits across Breakfast, Lunch, and Dinner (for example, ~500-600 kcal for Breakfast, ~700-800 kcal for Lunch, ~600-700 kcal for Dinner, adapting as needed to hit the target).
 However, you MUST ONLY generate the recipe and details for the SINGLE specific MEAL TYPE requested below.
-Ensure the macros for this specific meal fit logically within that daily budget (e.g. Breakfast should not be 1500 kcal).
+Ensure the calories and macros for this specific meal are strictly calculated so that it perfectly fits the allocation, ensuring the 3-meal total will meet the 2000 kcal (+/- 150 kcal) and 120g protein goals.
 
 MEAL TYPE TO GENERATE: {{MEAL_TYPE}}
 
@@ -164,7 +162,8 @@ IMPORTANT:
     debugPrint('[MealService] Using Vertex AI via Cloud Functions...');
 
     // Step 1: Generate recipe text
-    final prompt = 'Create a healthy ${mealType?.displayName ?? "meal"} recipe using these ingredients: $ingredients';
+    final systemPrompt = _mealGenerationPrompt.replaceAll('{{MEAL_TYPE}}', mealType?.displayName ?? "meal");
+    final prompt = '$systemPrompt\n\nUser Request: Create a healthy ${mealType?.displayName ?? "meal"} recipe using these ingredients: $ingredients';
     final response = await _vertexAIService.generateMealText(prompt);
 
     // Parse JSON response
@@ -198,7 +197,8 @@ IMPORTANT:
     _aiService.resetFallback();
 
     // Create system context message
-    final systemMessage = MessageModel.user(_mealGenerationPrompt);
+    final systemPrompt = _mealGenerationPrompt.replaceAll('{{MEAL_TYPE}}', mealType?.displayName ?? "meal");
+    final systemMessage = MessageModel.user(systemPrompt);
 
     // Create message for AI
     final userMessage = MessageModel.user(

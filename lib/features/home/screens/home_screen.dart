@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -12,6 +13,7 @@ import '../../meal_planning/screens/meal_plan_screen.dart';
 import '../../iot/screens/iot_dashboard_screen.dart';
 import '../../health/screens/health_dashboard_screen.dart';
 import '../../wallet/screens/wallet_screen.dart';
+import '../../auth/cubit/auth_cubit.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -31,20 +33,74 @@ class HomeScreen extends StatelessWidget {
 class HomeView extends StatelessWidget {
   const HomeView({super.key});
 
+  Future<bool> _onWillPop(BuildContext context, int selectedIndex) async {
+    if (selectedIndex != 0) {
+      // Return to home tab instead of exiting
+      context.read<HomeCubit>().setTab(0);
+      return false;
+    }
+    
+    // On home tab, confirm exit
+    final shouldPop = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(
+            'Exit App',
+            style: GoogleFonts.manrope(fontWeight: FontWeight.bold),
+          ),
+          content: Text(
+            'Do you really want to exit the application?',
+            style: GoogleFonts.manrope(),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.manrope(color: Colors.grey[600], fontWeight: FontWeight.w600),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(
+                'Exit',
+                style: GoogleFonts.manrope(color: Colors.red, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+    
+    return shouldPop ?? false;
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<HomeCubit, HomeState>(
       builder: (context, state) {
-        return Scaffold(
-          body: IndexedStack(
-            index: state.selectedIndex,
-            children: [
-              _buildHomeContent(context),
-              const AiAssistantScreen(),
-              const SettingsScreen(),
-            ],
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, result) async {
+            if (didPop) return;
+            final shouldPop = await _onWillPop(context, state.selectedIndex);
+            if (shouldPop) {
+              SystemNavigator.pop();
+            }
+          },
+          child: Scaffold(
+            body: IndexedStack(
+              index: state.selectedIndex,
+              children: [
+                _buildHomeContent(context),
+                const AiAssistantScreen(),
+                const SettingsScreen(),
+              ],
+            ),
+            bottomNavigationBar: _buildBottomNavigationBar(context, state),
           ),
-          bottomNavigationBar: _buildBottomNavigationBar(context, state),
         );
       },
     );
@@ -73,67 +129,75 @@ class HomeView extends StatelessWidget {
 
   // 1. Header Section
   Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      child: Row(
-        children: [
-          Stack(
+    return BlocBuilder<AuthCubit, AuthState>(
+      builder: (context, authState) {
+        final user = authState.user;
+        final photoUrl = user?.photoUrl;
+        final displayName = user?.displayName ?? 'The Smiths';
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          child: Row(
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2),
-                  image: const DecorationImage(
-                    image: NetworkImage('https://i.pravatar.cc/150?img=12'), // Placeholder Avatar
-                    fit: BoxFit.cover,
+              Stack(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                      image: DecorationImage(
+                        image: photoUrl != null && photoUrl.isNotEmpty
+                            ? NetworkImage(photoUrl)
+                            : const NetworkImage('https://i.pravatar.cc/150?img=12'),
+                        fit: BoxFit.cover,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 4,
+                        )
+                      ],
+                    ),
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 4,
-                    )
-                  ],
-                ),
-              ),
-              Positioned(
-                bottom: 0,
-                right: 0,
-                child: Container(
-                  width: 12,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: Colors.green,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
-            ],
-          ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Good Morning,',
-                style: GoogleFonts.manrope(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFF111418),
-                ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Good Morning,',
+                    style: GoogleFonts.manrope(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF111418),
+                    ),
+                  ),
+                  Text(
+                    displayName,
+                    style: GoogleFonts.manrope(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
               ),
-              Text(
-                'The Smiths',
-                style: GoogleFonts.manrope(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.grey[600],
-                ),
-              ),
-            ],
-          ),
           const Spacer(),
           Container(
             width: 40,
@@ -153,6 +217,8 @@ class HomeView extends StatelessWidget {
         ],
       ),
     );
+  },
+);
   }
 
   // 2. Summary Carousel (Horizontal Scroll)

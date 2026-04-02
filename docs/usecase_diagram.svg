@@ -1,0 +1,278 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2200" height="1600" viewBox="0 0 2200 1600">
+  <defs>
+    <style>
+      .bg { fill: #f4f8fc; }
+      .system { fill: #ffffff; stroke: #2b7cee; stroke-width: 3; rx: 26; ry: 26; }
+      .group { fill: #f8fbff; stroke: #a9c4ea; stroke-width: 2; rx: 18; ry: 18; }
+      .uc { fill: #ffffff; stroke: #2b7cee; stroke-width: 2; }
+      .line { stroke: #8298b3; stroke-width: 2.2; fill: none; }
+      .dash { stroke: #617289; stroke-width: 2.2; fill: none; stroke-dasharray: 10 7; marker-end: url(#arrow); }
+      .title { font: 700 30px 'Segoe UI', Arial, sans-serif; fill: #111418; }
+      .group-title { font: 700 22px 'Segoe UI', Arial, sans-serif; fill: #111418; }
+      .label { font: 600 16px 'Segoe UI', Arial, sans-serif; fill: #111418; text-anchor: middle; }
+      .actor { font: 700 18px 'Segoe UI', Arial, sans-serif; fill: #111418; text-anchor: middle; }
+      .rel { font: 600 14px 'Segoe UI', Arial, sans-serif; fill: #617289; text-anchor: middle; }
+      .note { font: 500 14px 'Segoe UI', Arial, sans-serif; fill: #617289; }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#617289" />
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="2200" height="1600" />
+  <rect class="system" x="280" y="90" width="1500" height="1420" />
+  <text class="title" x="1030" y="140" text-anchor="middle">Family Assistant Use Case Diagram</text>
+
+  <rect class="group" x="330" y="180" width="640" height="330" />
+  <text class="group-title" x="360" y="215">Authentication &amp; Settings</text>
+
+  <rect class="group" x="1030" y="180" width="690" height="240" />
+  <text class="group-title" x="1060" y="215">Expense &amp; Budget</text>
+
+  <rect class="group" x="330" y="550" width="640" height="275" />
+  <text class="group-title" x="360" y="585">Shopping &amp; Wallet</text>
+
+  <rect class="group" x="1030" y="460" width="690" height="560" />
+  <text class="group-title" x="1060" y="495">Meal Planning &amp; Health</text>
+
+  <rect class="group" x="330" y="865" width="640" height="155" />
+  <text class="group-title" x="360" y="900">AI Assistant</text>
+
+  <rect class="group" x="330" y="1060" width="1390" height="180" />
+  <text class="group-title" x="360" y="1095">Smart Home IoT</text>
+
+  <ellipse class="uc" cx="500" cy="265" rx="125" ry="36" />
+  <text class="label" x="500" y="270">Register account</text>
+  <ellipse class="uc" cx="790" cy="265" rx="125" ry="36" />
+  <text class="label" x="790" y="270">Login with email</text>
+  <ellipse class="uc" cx="500" cy="350" rx="125" ry="36" />
+  <text class="label" x="500" y="345">
+    <tspan x="500" dy="0">Login with</tspan>
+    <tspan x="500" dy="18">Google</tspan>
+  </text>
+  <ellipse class="uc" cx="790" cy="350" rx="125" ry="36" />
+  <text class="label" x="790" y="345">
+    <tspan x="790" dy="0">Reset</tspan>
+    <tspan x="790" dy="18">password</tspan>
+  </text>
+  <ellipse class="uc" cx="500" cy="435" rx="125" ry="36" />
+  <text class="label" x="500" y="440">Edit profile</text>
+  <ellipse class="uc" cx="790" cy="435" rx="140" ry="36" />
+  <text class="label" x="790" y="430">
+    <tspan x="790" dy="0">Change theme /</tspan>
+    <tspan x="790" dy="18">notification settings</tspan>
+  </text>
+  <ellipse class="uc" cx="670" cy="485" rx="130" ry="30" />
+  <text class="label" x="670" y="490">Sync profile data</text>
+  <ellipse class="uc" cx="870" cy="485" rx="95" ry="30" />
+  <text class="label" x="870" y="490">Sign out</text>
+
+  <ellipse class="uc" cx="1200" cy="275" rx="135" ry="36" />
+  <text class="label" x="1200" y="270">
+    <tspan x="1200" dy="0">Track income /</tspan>
+    <tspan x="1200" dy="18">expense</tspan>
+  </text>
+  <ellipse class="uc" cx="1540" cy="275" rx="135" ry="36" />
+  <text class="label" x="1540" y="270">
+    <tspan x="1540" dy="0">View expense</tspan>
+    <tspan x="1540" dy="18">overview</tspan>
+  </text>
+  <ellipse class="uc" cx="1200" cy="355" rx="130" ry="36" />
+  <text class="label" x="1200" y="360">Manage budget jars</text>
+  <ellipse class="uc" cx="1540" cy="355" rx="130" ry="36" />
+  <text class="label" x="1540" y="360">View financial reports</text>
+
+  <ellipse class="uc" cx="500" cy="650" rx="145" ry="36" />
+  <text class="label" x="500" y="655">Create shopping schedule</text>
+  <ellipse class="uc" cx="790" cy="650" rx="145" ry="36" />
+  <text class="label" x="790" y="645">
+    <tspan x="790" dy="0">Track pending /</tspan>
+    <tspan x="790" dy="18">completed schedules</tspan>
+  </text>
+  <ellipse class="uc" cx="500" cy="745" rx="145" ry="36" />
+  <text class="label" x="500" y="740">
+    <tspan x="500" dy="0">Mark schedule as</tspan>
+    <tspan x="500" dy="18">purchased</tspan>
+  </text>
+  <ellipse class="uc" cx="790" cy="745" rx="125" ry="36" />
+  <text class="label" x="790" y="750">Manage wallets</text>
+  <ellipse class="uc" cx="675" cy="805" rx="165" ry="30" />
+  <text class="label" x="675" y="800">
+    <tspan x="675" dy="0">Auto-deduct wallet for</tspan>
+    <tspan x="675" dy="18">automatic payment</tspan>
+  </text>
+
+  <ellipse class="uc" cx="1205" cy="565" rx="140" ry="36" />
+  <text class="label" x="1205" y="560">
+    <tspan x="1205" dy="0">Generate meal</tspan>
+    <tspan x="1205" dy="18">with AI</tspan>
+  </text>
+  <ellipse class="uc" cx="1545" cy="565" rx="140" ry="36" />
+  <text class="label" x="1545" y="560">
+    <tspan x="1545" dy="0">Save meal plan</tspan>
+    <tspan x="1545" dy="18">by date</tspan>
+  </text>
+  <ellipse class="uc" cx="1205" cy="690" rx="150" ry="36" />
+  <text class="label" x="1205" y="685">
+    <tspan x="1205" dy="0">View meal history /</tspan>
+    <tspan x="1205" dy="18">meal detail</tspan>
+  </text>
+  <ellipse class="uc" cx="1545" cy="690" rx="150" ry="36" />
+  <text class="label" x="1545" y="685">
+    <tspan x="1545" dy="0">Delete meal and sync</tspan>
+    <tspan x="1545" dy="18">nutrition</tspan>
+  </text>
+  <ellipse class="uc" cx="1205" cy="820" rx="150" ry="36" />
+  <text class="label" x="1205" y="825">Track steps automatically</text>
+  <ellipse class="uc" cx="1545" cy="820" rx="155" ry="36" />
+  <text class="label" x="1545" y="815">
+    <tspan x="1545" dy="0">Update water / sleep /</tspan>
+    <tspan x="1545" dy="18">activity data</tspan>
+  </text>
+  <ellipse class="uc" cx="1205" cy="945" rx="155" ry="36" />
+  <text class="label" x="1205" y="940">
+    <tspan x="1205" dy="0">Scan food image for</tspan>
+    <tspan x="1205" dy="18">nutrition estimate</tspan>
+  </text>
+  <ellipse class="uc" cx="1545" cy="945" rx="160" ry="36" />
+  <text class="label" x="1545" y="940">
+    <tspan x="1545" dy="0">View health dashboard /</tspan>
+    <tspan x="1545" dy="18">weekly report</tspan>
+  </text>
+
+  <ellipse class="uc" cx="650" cy="955" rx="155" ry="36" />
+  <text class="label" x="650" y="950">
+    <tspan x="650" dy="0">Chat with family AI</tspan>
+    <tspan x="650" dy="18">assistant</tspan>
+  </text>
+
+  <ellipse class="uc" cx="760" cy="1155" rx="145" ry="36" />
+  <text class="label" x="760" y="1150">
+    <tspan x="760" dy="0">Toggle</tspan>
+    <tspan x="760" dy="18">light / fan</tspan>
+  </text>
+  <ellipse class="uc" cx="1285" cy="1155" rx="170" ry="36" />
+  <text class="label" x="1285" y="1150">
+    <tspan x="1285" dy="0">Monitor temperature /</tspan>
+    <tspan x="1285" dy="18">humidity</tspan>
+  </text>
+
+  <g transform="translate(120,790)">
+    <circle cx="0" cy="-70" r="24" class="line" />
+    <line x1="0" y1="-46" x2="0" y2="18" class="line" />
+    <line x1="-38" y1="-10" x2="38" y2="-10" class="line" />
+    <line x1="0" y1="18" x2="-30" y2="72" class="line" />
+    <line x1="0" y1="18" x2="30" y2="72" class="line" />
+    <text class="actor" x="0" y="112">Family Member</text>
+  </g>
+
+  <g transform="translate(1940,230)">
+    <circle cx="0" cy="-55" r="22" class="line" />
+    <line x1="0" y1="-33" x2="0" y2="22" class="line" />
+    <line x1="-34" y1="-2" x2="34" y2="-2" class="line" />
+    <line x1="0" y1="22" x2="-28" y2="72" class="line" />
+    <line x1="0" y1="22" x2="28" y2="72" class="line" />
+    <text class="actor" x="0" y="110">
+      <tspan x="0" dy="0">Firebase Auth /</tspan>
+      <tspan x="0" dy="22">Google Sign-In</tspan>
+    </text>
+  </g>
+
+  <g transform="translate(1940,500)">
+    <circle cx="0" cy="-55" r="22" class="line" />
+    <line x1="0" y1="-33" x2="0" y2="22" class="line" />
+    <line x1="-34" y1="-2" x2="34" y2="-2" class="line" />
+    <line x1="0" y1="22" x2="-28" y2="72" class="line" />
+    <line x1="0" y1="22" x2="28" y2="72" class="line" />
+    <text class="actor" x="0" y="110">
+      <tspan x="0" dy="0">Firestore /</tspan>
+      <tspan x="0" dy="22">Firebase Storage</tspan>
+    </text>
+  </g>
+
+  <g transform="translate(1940,840)">
+    <circle cx="0" cy="-55" r="22" class="line" />
+    <line x1="0" y1="-33" x2="0" y2="22" class="line" />
+    <line x1="-34" y1="-2" x2="34" y2="-2" class="line" />
+    <line x1="0" y1="22" x2="-28" y2="72" class="line" />
+    <line x1="0" y1="22" x2="28" y2="72" class="line" />
+    <text class="actor" x="0" y="110">
+      <tspan x="0" dy="0">Gemini /</tspan>
+      <tspan x="0" dy="22">Vertex AI</tspan>
+    </text>
+  </g>
+
+  <g transform="translate(1940,1140)">
+    <circle cx="0" cy="-55" r="22" class="line" />
+    <line x1="0" y1="-33" x2="0" y2="22" class="line" />
+    <line x1="-34" y1="-2" x2="34" y2="-2" class="line" />
+    <line x1="0" y1="22" x2="-28" y2="72" class="line" />
+    <line x1="0" y1="22" x2="28" y2="72" class="line" />
+    <text class="actor" x="0" y="110">
+      <tspan x="0" dy="0">Phone Sensors /</tspan>
+      <tspan x="0" dy="22">Camera / Gallery</tspan>
+    </text>
+  </g>
+
+  <g transform="translate(1940,1390)">
+    <circle cx="0" cy="-55" r="22" class="line" />
+    <line x1="0" y1="-33" x2="0" y2="22" class="line" />
+    <line x1="-34" y1="-2" x2="34" y2="-2" class="line" />
+    <line x1="0" y1="22" x2="-28" y2="72" class="line" />
+    <line x1="0" y1="22" x2="28" y2="72" class="line" />
+    <text class="actor" x="0" y="110">
+      <tspan x="0" dy="0">MQTT Broker /</tspan>
+      <tspan x="0" dy="22">IoT Devices</tspan>
+    </text>
+  </g>
+
+  <path class="line" d="M160 790 L255 790 L255 1180" />
+  <path class="line" d="M255 265 L375 265" />
+  <path class="line" d="M255 350 L375 350" />
+  <path class="line" d="M255 435 L375 435" />
+  <path class="line" d="M255 650 L355 650" />
+  <path class="line" d="M255 745 L355 745" />
+  <path class="line" d="M255 955 L495 955" />
+  <path class="line" d="M255 1155 L615 1155" />
+  <path class="line" d="M255 275 L1065 275" />
+  <path class="line" d="M255 355 L1070 355" />
+  <path class="line" d="M255 690 L1055 690" />
+  <path class="line" d="M255 820 L1055 820" />
+  <path class="line" d="M255 945 L1050 945" />
+
+  <path class="line" d="M1918 230 L1835 230 L1835 485 L1000 485" />
+  <path class="line" d="M1835 245 L915 265" />
+  <path class="line" d="M1835 265 L915 265" />
+  <path class="line" d="M1835 320 L625 350" />
+  <path class="line" d="M1835 350 L915 350" />
+  <path class="line" d="M1835 405 L965 485" />
+
+  <path class="line" d="M1918 500 L1845 500 L1845 955 L1705 955" />
+  <path class="line" d="M1845 520 L1675 275" />
+  <path class="line" d="M1845 560 L1670 355" />
+  <path class="line" d="M1845 620 L935 805" />
+  <path class="line" d="M1845 660 L1680 565" />
+  <path class="line" d="M1845 720 L1695 690" />
+  <path class="line" d="M1845 820 L1700 820" />
+
+  <path class="line" d="M1918 840 L1705 840" />
+  <path class="line" d="M1705 840 L1705 565" />
+  <path class="line" d="M1705 945 L1360 945" />
+  <path class="line" d="M1705 900 L805 955" />
+
+  <path class="line" d="M1918 1140 L1705 1140" />
+  <path class="line" d="M1705 1140 L1705 820 L1700 820" />
+  <path class="line" d="M1705 1140 L1705 945 L1360 945" />
+
+  <path class="line" d="M1918 1390 L1760 1390 L1760 1155 L1455 1155" />
+  <path class="line" d="M1760 1155 L905 1155" />
+
+  <path class="dash" d="M555 455 L615 480" />
+  <text class="rel" x="575" y="462">&lt;&lt;include&gt;&gt;</text>
+  <path class="dash" d="M575 760 L690 742" />
+  <text class="rel" x="625" y="735">&lt;&lt;extend&gt;&gt;</text>
+  <path class="dash" d="M800 805 L804 782" />
+  <text class="rel" x="865" y="800">&lt;&lt;include&gt;&gt;</text>
+
+  <text class="note" x="330" y="1295">Image exported locally as SVG so you can preview it directly in VS Code.</text>
+</svg>

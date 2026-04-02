@@ -1,0 +1,140 @@
+@startuml
+left to right direction
+
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor #F8FBFF
+  BorderColor #2B7CEE
+  ArrowColor #617289
+}
+skinparam actor {
+  BorderColor #111418
+  BackgroundColor #FFFFFF
+}
+
+actor "Family Member" as User
+actor "Firebase Auth /\nGoogle Sign-In" as AuthProvider
+actor "Firestore /\nFirebase Storage" as FirebaseData
+actor "Gemini / Vertex AI" as AIPlatform
+actor "Phone Sensors /\nCamera / Gallery" as DeviceSensors
+actor "MQTT Broker /\nIoT Devices" as IoTPlatform
+
+rectangle "Family Assistant" {
+  package "Authentication & Settings" {
+    usecase "Register account" as UC_Register
+    usecase "Login with email" as UC_Login
+    usecase "Login with Google" as UC_GoogleLogin
+    usecase "Reset password" as UC_ResetPassword
+    usecase "Edit profile" as UC_EditProfile
+    usecase "Sync profile data" as UC_SyncProfile
+    usecase "Change theme /\nnotification settings" as UC_Settings
+    usecase "Sign out" as UC_SignOut
+  }
+
+  package "Expense & Budget" {
+    usecase "Track income /\nexpense" as UC_TrackExpense
+    usecase "View expense overview" as UC_ExpenseOverview
+    usecase "Manage budget jars" as UC_BudgetJars
+    usecase "View financial reports" as UC_Reports
+  }
+
+  package "Shopping & Wallet" {
+    usecase "Create shopping schedule" as UC_CreateSchedule
+    usecase "Track pending /\ncompleted schedules" as UC_ViewSchedule
+    usecase "Mark schedule as\npurchased" as UC_MarkPurchased
+    usecase "Manage wallets" as UC_ManageWallet
+    usecase "Auto-deduct wallet for\nautomatic payment" as UC_AutoPay
+  }
+
+  package "Meal Planning & Health" {
+    usecase "Generate meal with AI" as UC_GenerateMeal
+    usecase "Save meal plan by date" as UC_SaveMeal
+    usecase "View meal history /\nmeal detail" as UC_ViewMealHistory
+    usecase "Delete meal and sync\nnutrition" as UC_DeleteMeal
+    usecase "Track steps automatically" as UC_TrackSteps
+    usecase "Update water / sleep /\nactivity data" as UC_UpdateHealth
+    usecase "Scan food image for\nnutrition estimate" as UC_ScanFood
+    usecase "View health dashboard /\nweekly report" as UC_ViewHealth
+  }
+
+  package "AI Assistant" {
+    usecase "Chat with family AI\nassistant" as UC_ChatAI
+  }
+
+  package "Smart Home IoT" {
+    usecase "Toggle light / fan" as UC_ControlIoT
+    usecase "Monitor temperature /\nhumidity" as UC_MonitorIoT
+  }
+}
+
+User --> UC_Register
+User --> UC_Login
+User --> UC_GoogleLogin
+User --> UC_ResetPassword
+User --> UC_EditProfile
+User --> UC_Settings
+User --> UC_SignOut
+
+User --> UC_TrackExpense
+User --> UC_ExpenseOverview
+User --> UC_BudgetJars
+User --> UC_Reports
+
+User --> UC_CreateSchedule
+User --> UC_ViewSchedule
+User --> UC_MarkPurchased
+User --> UC_ManageWallet
+
+User --> UC_GenerateMeal
+User --> UC_SaveMeal
+User --> UC_ViewMealHistory
+User --> UC_DeleteMeal
+User --> UC_TrackSteps
+User --> UC_UpdateHealth
+User --> UC_ScanFood
+User --> UC_ViewHealth
+
+User --> UC_ChatAI
+
+User --> UC_ControlIoT
+User --> UC_MonitorIoT
+
+UC_EditProfile .> UC_SyncProfile : <<include>>
+UC_MarkPurchased .> UC_ViewSchedule : <<extend>>
+UC_AutoPay .> UC_ManageWallet : <<include>>
+
+UC_Register --> AuthProvider
+UC_Login --> AuthProvider
+UC_GoogleLogin --> AuthProvider
+UC_ResetPassword --> AuthProvider
+UC_SignOut --> AuthProvider
+
+UC_SyncProfile --> FirebaseData
+UC_TrackExpense --> FirebaseData
+UC_ExpenseOverview --> FirebaseData
+UC_BudgetJars --> FirebaseData
+UC_Reports --> FirebaseData
+UC_CreateSchedule --> FirebaseData
+UC_ViewSchedule --> FirebaseData
+UC_MarkPurchased --> FirebaseData
+UC_ManageWallet --> FirebaseData
+UC_AutoPay --> FirebaseData
+UC_SaveMeal --> FirebaseData
+UC_ViewMealHistory --> FirebaseData
+UC_DeleteMeal --> FirebaseData
+UC_TrackSteps --> FirebaseData
+UC_UpdateHealth --> FirebaseData
+UC_ViewHealth --> FirebaseData
+
+UC_GenerateMeal --> AIPlatform
+UC_ScanFood --> AIPlatform
+UC_ChatAI --> AIPlatform
+
+UC_TrackSteps --> DeviceSensors
+UC_ScanFood --> DeviceSensors
+
+UC_ControlIoT --> IoTPlatform
+UC_MonitorIoT --> IoTPlatform
+
+@enduml

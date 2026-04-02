@@ -12,10 +12,10 @@ class HealthDashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) => HealthDashboardCubit(),
-      child: const HealthDashboardView(),
-    );
+    // Refresh data when entering the screen
+    // The cubit is provided at app-level so step tracking persists
+    context.read<HealthDashboardCubit>().refresh();
+    return const HealthDashboardView();
   }
 }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../cubit/ai_assistant_cubit.dart';
+import '../../auth/cubit/auth_cubit.dart';
 
 class AiAssistantScreen extends StatelessWidget {
   const AiAssistantScreen({super.key});
@@ -76,6 +77,9 @@ class _AiAssistantViewState extends State<AiAssistantView> {
         ? Colors.white.withValues(alpha: 0.1)
         : Colors.grey[200]!;
 
+    final authState = context.watch<AuthCubit>().state;
+    final photoUrl = authState.user?.photoUrl;
+
     return BlocConsumer<AiAssistantCubit, AiAssistantState>(
       listener: (context, state) {
         _scrollToBottom();
@@ -119,7 +123,7 @@ class _AiAssistantViewState extends State<AiAssistantView> {
                       return Padding(
                         padding: EdgeInsets.only(top: showSpacing ? 24 : 0),
                         child: message.role == MessageRole.user
-                            ? _buildUserMessage(message.content)
+                            ? _buildUserMessage(message.content, photoUrl)
                             : _buildAiMessage(message.content, cardColor, textColor),
                       );
                     },
@@ -135,7 +139,7 @@ class _AiAssistantViewState extends State<AiAssistantView> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       _buildSuggestions(isDarkMode, state.isLoading),
-                      _buildComposer(cardColor, textColor, borderColor, isDarkMode, state.isLoading),
+                      _buildComposer(cardColor, textColor, borderColor, isDarkMode, state.isLoading, photoUrl),
                     ],
                   ),
                 ),
@@ -262,7 +266,7 @@ class _AiAssistantViewState extends State<AiAssistantView> {
     );
   }
 
-  Widget _buildUserMessage(String text) {
+  Widget _buildUserMessage(String text, String? photoUrl) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       crossAxisAlignment: CrossAxisAlignment.end,
@@ -296,9 +300,11 @@ class _AiAssistantViewState extends State<AiAssistantView> {
           ),
         ),
         const SizedBox(width: 12),
-        const CircleAvatar(
+        CircleAvatar(
           radius: 16,
-          backgroundImage: NetworkImage("https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=100&auto=format&fit=crop"),
+          backgroundImage: photoUrl != null && photoUrl.isNotEmpty
+              ? NetworkImage(photoUrl)
+              : const NetworkImage("https://i.pravatar.cc/150?img=12"),
         ),
       ],
     );
@@ -385,14 +391,16 @@ class _AiAssistantViewState extends State<AiAssistantView> {
     );
   }
 
-  Widget _buildComposer(Color cardColor, Color textColor, Color borderColor, bool isDarkMode, bool isLoading) {
+  Widget _buildComposer(Color cardColor, Color textColor, Color borderColor, bool isDarkMode, bool isLoading, String? photoUrl) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
-          const CircleAvatar(
+          CircleAvatar(
             radius: 20,
-            backgroundImage: NetworkImage("https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=100"),
+            backgroundImage: photoUrl != null && photoUrl.isNotEmpty
+                ? NetworkImage(photoUrl)
+                : const NetworkImage("https://i.pravatar.cc/150?img=12"),
           ),
           const SizedBox(width: 12),
           Expanded(

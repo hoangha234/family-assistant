@@ -6,6 +6,9 @@ import 'package:firebase_app_check/firebase_app_check.dart';
 import 'firebase_options.dart';
 import 'package:family_assistant/features/health/services/notification_service.dart';
 import 'package:family_assistant/features/settings/cubit/settings_cubit.dart';
+import 'package:family_assistant/features/auth/cubit/auth_cubit.dart';
+import 'package:family_assistant/features/health/cubit/health_dashboard_cubit.dart';
+import 'package:family_assistant/features/home/screens/home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,8 +30,12 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) => SettingsCubit(),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(create: (context) => SettingsCubit()),
+        BlocProvider(create: (context) => AuthCubit()..initialize()),
+        BlocProvider(create: (context) => HealthDashboardCubit()),
+      ],
       child: BlocBuilder<SettingsCubit, SettingsState>(
         builder: (context, state) {
           return MaterialApp(
@@ -43,10 +50,35 @@ class MyApp extends StatelessWidget {
               colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0D6CF2), brightness: Brightness.dark),
               useMaterial3: true,
             ),
-            home: const LoginScreen(),
+            home: const AuthWrapper(),
           );
         },
       ),
+    );
+  }
+}
+
+class AuthWrapper extends StatelessWidget {
+  const AuthWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<AuthCubit, AuthState>(
+      builder: (context, state) {
+        if (state.status == AuthStatus.initial || state.status == AuthStatus.loading) {
+          return const Scaffold(
+            body: Center(
+              child: CircularProgressIndicator(color: Color(0xFF0D6CF2)),
+            ),
+          );
+        }
+        
+        if (state.isAuthenticated) {
+          return const HomeScreen();
+        }
+        
+        return const LoginScreen();
+      },
     );
   }
 }
