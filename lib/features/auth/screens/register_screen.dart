@@ -173,7 +173,7 @@ class _RegisterViewState extends State<RegisterView> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Join the family today',
+                    'Start your journey today',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,

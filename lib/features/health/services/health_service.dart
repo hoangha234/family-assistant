@@ -398,6 +398,24 @@ class HealthService {
     }
   }
 
+  Future<List<HealthData>> loadWeeklyHealthData(DateTime endDate) async {
+    try {
+      final startDate = endDate.subtract(const Duration(days: 6));
+      final startDateString = _formatDate(startDate);
+      final endDateString = _formatDate(endDate);
+
+      final snapshot = await _healthCollection
+          .where('date', isGreaterThanOrEqualTo: startDateString)
+          .where('date', isLessThanOrEqualTo: endDateString)
+          .get();
+
+      return snapshot.docs.map((doc) => HealthData.fromFirestore(doc)).toList();
+    } catch (e) {
+      debugPrint('[HealthService] Error loading weekly data: $e');
+      return [];
+    }
+  }
+
   Future<void> updateHealthData({
     int? steps,
     double? sleepHours,
@@ -434,25 +452,33 @@ class HealthService {
   }
 
   /// Add nutrition to a specific date (reads current and adds)
-  Future<void> addNutritionForDate(DateTime date, int addedCalories, int addedProtein) async {
+  Future<void> addNutritionForDate(DateTime date, int addedCalories, int addedProtein, {int addedCarbs = 0, int addedFat = 0}) async {
     try {
       final dateString = _formatDate(date);
       final doc = await _healthCollection.doc(dateString).get();
       int currentCal = 0;
       int currentPro = 0;
+      int currentCarbs = 0;
+      int currentFat = 0;
       if (doc.exists && doc.data() != null) {
         final data = doc.data()!;
         currentCal = (data['calories'] as num?)?.toInt() ?? 0;
         currentPro = (data['protein'] as num?)?.toInt() ?? 0;
+        currentCarbs = (data['carbs'] as num?)?.toInt() ?? 0;
+        currentFat = (data['fat'] as num?)?.toInt() ?? 0;
       }
       
       final updatedCalories = (currentCal + addedCalories).clamp(0, 99999);
       final updatedProtein = (currentPro + addedProtein).clamp(0, 9999);
+      final updatedCarbs = (currentCarbs + addedCarbs).clamp(0, 9999);
+      final updatedFat = (currentFat + addedFat).clamp(0, 9999);
       
       await updateHealthData(
         date: date,
         calories: updatedCalories,
         protein: updatedProtein,
+        carbs: updatedCarbs,
+        fat: updatedFat,
       );
     } catch (e) {
       debugPrint('[HealthService] Error adding nutrition for date: $e');

@@ -31,7 +31,8 @@ class _SleepDetailsViewState extends State<_SleepDetailsView> {
   static const Color primaryMint = Color(0xFF6DFE9C);
 
   bool get isDark => Theme.of(context).brightness == Brightness.dark;
-  Color get background => isDark ? const Color(0xFF101822) : const Color(0xFFF7F9FB);
+  Color get background =>
+      isDark ? const Color(0xFF101822) : const Color(0xFFF7F9FB);
   Color get surfaceWhite => isDark ? const Color(0xFF1A2737) : Colors.white;
   Color get textMain => isDark ? Colors.white : const Color(0xFF2C3437);
   Color get textVariant => isDark ? Colors.grey[400]! : const Color(0xFF596064);
@@ -42,7 +43,7 @@ class _SleepDetailsViewState extends State<_SleepDetailsView> {
     final cubit = context.read<SleepCubit>();
     TimeOfDay initialBedtime = const TimeOfDay(hour: 22, minute: 0);
     TimeOfDay initialWakeup = const TimeOfDay(hour: 6, minute: 0);
-    
+
     final currentData = cubit.state.sleepData;
     if (currentData != null) {
       initialBedtime = TimeOfDay.fromDateTime(currentData.bedtime);
@@ -68,6 +69,18 @@ class _SleepDetailsViewState extends State<_SleepDetailsView> {
     if (selectedWakeup == null) return;
 
     await cubit.saveSchedule(selectedBedtime, selectedWakeup);
+
+    // After saving, show confirmation dialog
+    if (!context.mounted) return;
+    _dialogShown = false;
+    // Small delay to let Firestore stream update the state
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (!context.mounted) return;
+    final data = cubit.state.sleepData;
+    if (data != null && !data.isConfirmed && !_dialogShown) {
+      _dialogShown = true;
+      _showConfirmationDialog(context);
+    }
   }
 
   void _showConfirmationDialog(BuildContext context) {
@@ -77,7 +90,7 @@ class _SleepDetailsViewState extends State<_SleepDetailsView> {
       builder: (dialogContext) {
         return AlertDialog(
           title: const Text('Sleep Quality'),
-          content: const Text('Bạn có ngủ đủ giấc như đã đặt không?'),
+          content: const Text('Did you get enough sleep as planned?'),
           actions: [
             TextButton(
               onPressed: () {
@@ -121,25 +134,40 @@ class _SleepDetailsViewState extends State<_SleepDetailsView> {
       },
       builder: (context, state) {
         final data = state.sleepData;
-        final bool isLoading = state.status == SleepStatus.loading || state.status == SleepStatus.initial;
-        
+        final bool isLoading =
+            state.status == SleepStatus.loading ||
+            state.status == SleepStatus.initial;
+
         final durationText = data?.formattedSleepDuration ?? '0h 00m';
         final qualityTag = data?.qualityTag ?? 'No Data';
 
-        final bedtimeText = data != null ? DateFormat('HH:mm').format(data.bedtime) : '--:--';
-        final wakeupText = data != null ? DateFormat('HH:mm').format(data.wakeup) : '--:--';
+        final bedtimeText = data != null
+            ? DateFormat('HH:mm').format(data.bedtime)
+            : '--:--';
+        final wakeupText = data != null
+            ? DateFormat('HH:mm').format(data.wakeup)
+            : '--:--';
 
         return Scaffold(
           backgroundColor: background,
           appBar: _buildAppBar(context),
           body: isLoading
-              ? const Center(child: CircularProgressIndicator(color: primaryGreen))
+              ? const Center(
+                  child: CircularProgressIndicator(color: primaryGreen),
+                )
               : SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 16,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildHeroCard(durationText, qualityTag, state.history7Days),
+                      _buildHeroCard(
+                        durationText,
+                        qualityTag,
+                        state.history7Days,
+                      ),
                       const SizedBox(height: 32),
                       _buildSleepStagesSection(state),
                       const SizedBox(height: 32),
@@ -195,7 +223,11 @@ class _SleepDetailsViewState extends State<_SleepDetailsView> {
     );
   }
 
-  Widget _buildHeroCard(String durationText, String qualityTag, List<SleepData> history7Days) {
+  Widget _buildHeroCard(
+    String durationText,
+    String qualityTag,
+    List<SleepData> history7Days,
+  ) {
     return Container(
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
@@ -246,16 +278,28 @@ class _SleepDetailsViewState extends State<_SleepDetailsView> {
               crossAxisAlignment: CrossAxisAlignment.end,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: List.generate(7, (index) {
-                final dataIndex = index - (7 - history7Days.length);
-                if (dataIndex < 0) {
+                final now = DateTime.now();
+                final targetDate = DateTime(now.year, now.month, now.day)
+                    .subtract(Duration(days: 6 - index));
+
+                final matchingData = history7Days.where((data) =>
+                    data.date.year == targetDate.year &&
+                    data.date.month == targetDate.month &&
+                    data.date.day == targetDate.day
+                ).toList();
+
+                if (matchingData.isEmpty) {
                   return _bar(0.05, Colors.grey.withOpacity(0.1));
                 }
-                final data = history7Days[dataIndex];
+
+                final data = matchingData.first;
                 final duration = data.wakeup.difference(data.bedtime);
                 final factor = (duration.inMinutes / 600).clamp(0.05, 1.0);
-                
-                final isToday = dataIndex == history7Days.length - 1;
-                final color = isToday ? primaryGreen : primaryMint.withOpacity(0.8);
+
+                final isToday = index == 6;
+                final color = isToday
+                    ? primaryGreen
+                    : primaryMint.withOpacity(0.8);
                 return _bar(factor, color);
               }),
             ),
@@ -359,10 +403,26 @@ class _SleepDetailsViewState extends State<_SleepDetailsView> {
                 crossAxisCount: 2,
                 childAspectRatio: 2.5,
                 children: [
-                  _legendItem('Deep Sleep', state.deepSleepFormatted, primaryGreen),
-                  _legendItem('REM Sleep', state.remSleepFormatted, primaryMint),
-                  _legendItem('Light Sleep', state.lightSleepFormatted, Colors.grey.shade300),
-                  _legendItem('Awake', state.awakeFormatted, isDark ? const Color(0xFF0F172A) : const Color(0xFFD3E4FE)),
+                  _legendItem(
+                    'Deep Sleep',
+                    state.deepSleepFormatted,
+                    primaryGreen,
+                  ),
+                  _legendItem(
+                    'REM Sleep',
+                    state.remSleepFormatted,
+                    primaryMint,
+                  ),
+                  _legendItem(
+                    'Light Sleep',
+                    state.lightSleepFormatted,
+                    Colors.grey.shade300,
+                  ),
+                  _legendItem(
+                    'Awake',
+                    state.awakeFormatted,
+                    isDark ? const Color(0xFF0F172A) : const Color(0xFFD3E4FE),
+                  ),
                 ],
               ),
             ],
@@ -385,7 +445,10 @@ class _SleepDetailsViewState extends State<_SleepDetailsView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            ),
             Text(time, style: TextStyle(fontSize: 10, color: textVariant)),
           ],
         ),
@@ -409,7 +472,11 @@ class _SleepDetailsViewState extends State<_SleepDetailsView> {
       decoration: BoxDecoration(
         color: surfaceWhite,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: isDark ? const Color(0xFF334155) : Colors.white.withOpacity(0.6)),
+        border: Border.all(
+          color: isDark
+              ? const Color(0xFF334155)
+              : Colors.white.withOpacity(0.6),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -419,7 +486,10 @@ class _SleepDetailsViewState extends State<_SleepDetailsView> {
           Text(title, style: TextStyle(fontSize: 12, color: textVariant)),
           Text(
             time,
-            style: GoogleFonts.manrope(fontSize: 18, fontWeight: FontWeight.bold),
+            style: GoogleFonts.manrope(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),
@@ -450,7 +520,9 @@ class _SleepDetailsViewState extends State<_SleepDetailsView> {
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(32),
+          ),
         ),
         child: const Text(
           'Sleep Schedule',
@@ -466,7 +538,7 @@ class _SleepDetailsViewState extends State<_SleepDetailsView> {
 
   Widget _buildSleepHistorySection(List<SleepData> history) {
     if (history.isEmpty) return const SizedBox();
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -489,10 +561,10 @@ class _SleepDetailsViewState extends State<_SleepDetailsView> {
             final dateText = DateFormat('dd MMM').format(data.date);
             final durationText = data.formattedSleepDuration;
             final qualityTag = data.qualityTag;
-            
+
             final duration = data.wakeup.difference(data.bedtime);
             final hours = duration.inMinutes / 60;
-            
+
             final isGood = qualityTag.toLowerCase().contains('good');
             final color = isGood ? primaryGreen : Colors.grey;
 
@@ -540,7 +612,10 @@ class _SleepDetailsViewState extends State<_SleepDetailsView> {
                   ),
                   const SizedBox(width: 16),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: color.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
@@ -563,4 +638,3 @@ class _SleepDetailsViewState extends State<_SleepDetailsView> {
     );
   }
 }
-

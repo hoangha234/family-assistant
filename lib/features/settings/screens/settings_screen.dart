@@ -6,6 +6,7 @@ import '../cubit/settings_cubit.dart';
 import '../../home/cubit/home_cubit.dart';
 import '../../auth/cubit/auth_cubit.dart';
 import '../../auth/screens/login_screen.dart';
+import '../../iot/screens/iot_dashboard_screen.dart';
 import 'edit_profile_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -114,6 +115,14 @@ class SettingsView extends StatelessWidget {
                               textColor: textColor,
                               showBorder: false,
                               borderColor: borderColor,
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const IotDashboardScreen(),
+                                  ),
+                                );
+                              },
                             ),
                           ],
                         ),
@@ -127,13 +136,6 @@ class SettingsView extends StatelessWidget {
                               title: "Push Notifications",
                               value: state.pushNotifications,
                               onChanged: (val) => context.read<SettingsCubit>().toggleNotifications(val),
-                              textColor: textColor,
-                              showBorder: true,
-                              borderColor: borderColor,
-                            ),
-                            _buildSettingsTile(
-                              icon: Icons.family_restroom,
-                              title: "Family Alerts",
                               textColor: textColor,
                               showBorder: false,
                               borderColor: borderColor,
@@ -213,7 +215,7 @@ class SettingsView extends StatelessWidget {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          "Family Assistant v1.0.0",
+                          "iMate v1.0.0",
                           style: GoogleFonts.manrope(fontSize: 12, color: textGrey),
                         ),
                         const SizedBox(height: 24),
@@ -260,14 +262,7 @@ class SettingsView extends StatelessWidget {
                   ],
                 ),
               ),
-              Text(
-                "Save",
-                style: GoogleFonts.manrope(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: primaryColor,
-                ),
-              ),
+              const SizedBox(width: 40),
             ],
           ),
         ),

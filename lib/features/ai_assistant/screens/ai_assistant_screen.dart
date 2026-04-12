@@ -169,7 +169,7 @@ class _AiAssistantViewState extends State<AiAssistantView> {
             child: Column(
               children: [
                 Text(
-                  "Family AI",
+                  "iMate AI",
                   style: GoogleFonts.manrope(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -237,7 +237,7 @@ class _AiAssistantViewState extends State<AiAssistantView> {
             children: [
               Padding(
                 padding: const EdgeInsets.only(left: 4, bottom: 4),
-                child: Text("Family AI", style: GoogleFonts.manrope(fontSize: 12, fontWeight: FontWeight.w500, color: textGrey)),
+                child: Text("iMate AI", style: GoogleFonts.manrope(fontSize: 12, fontWeight: FontWeight.w500, color: textGrey)),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

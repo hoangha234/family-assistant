@@ -172,6 +172,8 @@ class MealPlanCubit extends Cubit<MealPlanState> {
           state.selectedDate,
           mealToSave.calories,
           mealToSave.protein,
+          addedCarbs: mealToSave.carbs,
+          addedFat: mealToSave.fats,
         );
       } catch (e) {
         debugPrint('[MealPlanCubit] Failed to add health data: $e');
@@ -224,6 +226,8 @@ class MealPlanCubit extends Cubit<MealPlanState> {
             state.selectedDate,
             -deletedMeal.calories,
             -deletedMeal.protein,
+            addedCarbs: -deletedMeal.carbs,
+            addedFat: -deletedMeal.fats,
           );
         } catch (e) {
           debugPrint('[MealPlanCubit] Failed to subtract health data: $e');

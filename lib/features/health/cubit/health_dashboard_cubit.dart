@@ -213,9 +213,47 @@ class HealthDashboardCubit extends Cubit<HealthDashboardState> {
         activityGoal: data.activityGoal,
       ));
 
+      // Calculate weekly averages
+      await _loadWeeklyData();
+
       debugPrint('[HealthDashboardCubit] Data loaded: steps=${data.steps}, calories=${data.calories}');
     } catch (e) {
       debugPrint('[HealthDashboardCubit] Error loading data: $e');
+    }
+  }
+
+  Future<void> _loadWeeklyData() async {
+    try {
+      final endDate = DateTime.now();
+      final weeklyData = await _healthService.loadWeeklyHealthData(endDate);
+      
+      int sleepDaysCount = 0;
+      double totalSleepProgress = 0;
+      double totalWaterProgress = 0;
+      double totalCalorieProgress = 0;
+      double totalProteinProgress = 0;
+      double totalStepProgress = 0;
+      
+      for (final dayData in weeklyData) {
+        if (dayData.sleepHours > 0) {
+          totalSleepProgress += dayData.sleepProgress;
+          sleepDaysCount++;
+        }
+        totalWaterProgress += dayData.waterProgress;
+        totalCalorieProgress += dayData.calorieProgress;
+        totalProteinProgress += dayData.proteinProgress;
+        totalStepProgress += dayData.stepProgress;
+      }
+      
+      emit(state.copyWith(
+        weeklyAvgSleepProgress: sleepDaysCount > 0 ? (totalSleepProgress / sleepDaysCount).clamp(0.0, 1.0) : 0.0,
+        weeklyAvgWaterProgress: (totalWaterProgress / 7).clamp(0.0, 1.0),
+        weeklyAvgCalorieProgress: (totalCalorieProgress / 7).clamp(0.0, 1.0),
+        weeklyAvgProteinProgress: (totalProteinProgress / 7).clamp(0.0, 1.0),
+        weeklyAvgStepProgress: (totalStepProgress / 7).clamp(0.0, 1.0),
+      ));
+    } catch (e) {
+      debugPrint('[HealthDashboardCubit] Error loading weekly data: $e');
     }
   }
 

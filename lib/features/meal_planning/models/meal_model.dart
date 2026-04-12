@@ -123,7 +123,7 @@ class MealModel {
       calories: (json['calories'] as num?)?.toInt() ?? 0,
       protein: (json['protein'] as num?)?.toInt() ?? 0,
       carbs: (json['carbs'] as num?)?.toInt() ?? 0,
-      fats: (json['fats'] as num?)?.toInt() ?? 0,
+      fats: (json['fats'] as num?)?.toInt() ?? (json['fat'] as num?)?.toInt() ?? 0,
       ingredients: (json['ingredients'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
@@ -235,7 +235,7 @@ class MealModel {
       calories: (map['calories'] as num?)?.toInt() ?? 0,
       protein: (map['protein'] as num?)?.toInt() ?? 0,
       carbs: (map['carbs'] as num?)?.toInt() ?? 0,
-      fats: (map['fats'] as num?)?.toInt() ?? 0,
+      fats: (map['fats'] as num?)?.toInt() ?? (map['fat'] as num?)?.toInt() ?? 0,
       ingredients: (map['ingredients'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
@@ -316,7 +316,7 @@ class MealModel {
       calories: (json['calories'] as num?)?.toInt() ?? 0,
       protein: (json['protein'] as num?)?.toInt() ?? 0,
       carbs: (json['carbs'] as num?)?.toInt() ?? 0,
-      fats: (json['fats'] as num?)?.toInt() ?? 0,
+      fats: (json['fats'] as num?)?.toInt() ?? (json['fat'] as num?)?.toInt() ?? 0,
       ingredients: (json['ingredients'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??

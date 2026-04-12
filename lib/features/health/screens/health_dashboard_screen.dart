@@ -69,7 +69,7 @@ class HealthDashboardView extends StatelessWidget {
                     const SizedBox(height: 24),
                     _buildTodayHealthSummary(state, cardColor, textColor, isDarkMode),
                     const SizedBox(height: 24),
-                    _buildWeeklyOverview(context, cardColor, textColor, isDarkMode),
+                    _buildWeeklyOverview(context, state, cardColor, textColor, isDarkMode),
                   ],
                 ),
               ),
@@ -572,13 +572,23 @@ class HealthDashboardView extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 _buildSummaryRow(
-                  label: "Activity",
-                  current: state.activityMinutes,
-                  goal: state.activityGoal,
-                  unit: "min",
+                  label: "Carbohydrates",
+                  current: state.carbs,
+                  goal: state.carbsGoal,
+                  unit: "g",
                   textColor: textColor,
                   isDarkMode: isDarkMode,
                 ),
+                const SizedBox(height: 16),
+                _buildSummaryRow(
+                  label: "Fats",
+                  current: state.fat,
+                  goal: state.fatGoal,
+                  unit: "g",
+                  textColor: textColor,
+                  isDarkMode: isDarkMode,
+                ),
+
               ],
             ),
           ),
@@ -636,7 +646,7 @@ class HealthDashboardView extends StatelessWidget {
     );
   }
 
-  Widget _buildWeeklyOverview(BuildContext context, Color cardColor, Color textColor, bool isDarkMode) {
+  Widget _buildWeeklyOverview(BuildContext context, HealthDashboardState state, Color cardColor, Color textColor, bool isDarkMode) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -688,17 +698,17 @@ class HealthDashboardView extends StatelessWidget {
             ),
             child: Column(
               children: [
-                // Day labels
+                // Metric labels
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day) {
+                  children: ['Sleep', 'Water', 'Cals', 'Protein', 'Steps'].map((label) {
                     return SizedBox(
-                      width: 36,
+                      width: 46,
                       child: Text(
-                        day,
+                        label,
                         textAlign: TextAlign.center,
                         style: GoogleFonts.manrope(
-                          fontSize: 12,
+                          fontSize: 11,
                           fontWeight: FontWeight.w500,
                           color: textMuted,
                         ),
@@ -714,13 +724,11 @@ class HealthDashboardView extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      _buildWeekBar(0.5, false, isDarkMode),
-                      _buildWeekBar(0.65, false, isDarkMode),
-                      _buildWeekBar(0.75, true, isDarkMode), // Today (Wednesday)
-                      _buildWeekBar(0.4, false, isDarkMode),
-                      _buildWeekBar(0.55, false, isDarkMode),
-                      _buildWeekBar(0.85, false, isDarkMode),
-                      _buildWeekBar(0.7, false, isDarkMode),
+                      _buildWeekBar(state.weeklyAvgSleepProgress, true, isDarkMode, width: 46),
+                      _buildWeekBar(state.weeklyAvgWaterProgress, true, isDarkMode, width: 46),
+                      _buildWeekBar(state.weeklyAvgCalorieProgress, true, isDarkMode, width: 46),
+                      _buildWeekBar(state.weeklyAvgProteinProgress, true, isDarkMode, width: 46),
+                      _buildWeekBar(state.weeklyAvgStepProgress, true, isDarkMode, width: 46),
                     ],
                   ),
                 ),
@@ -732,12 +740,12 @@ class HealthDashboardView extends StatelessWidget {
     );
   }
 
-  Widget _buildWeekBar(double heightFactor, bool isToday, bool isDarkMode) {
+  Widget _buildWeekBar(double heightFactor, bool isToday, bool isDarkMode, {double width = 36}) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
         Container(
-          width: 36,
+          width: width,
           height: 100 * heightFactor,
           decoration: BoxDecoration(
             gradient: LinearGradient(

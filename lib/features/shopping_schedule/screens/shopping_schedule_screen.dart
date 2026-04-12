@@ -11,10 +11,7 @@ class ShoppingScheduleScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) => ShoppingScheduleCubit()..initialize(),
-      child: const ShoppingScheduleView(),
-    );
+    return const ShoppingScheduleView();
   }
 }
 

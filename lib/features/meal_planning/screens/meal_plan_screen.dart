@@ -13,10 +13,7 @@ class MealPlanScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) => MealPlanCubit()..loadMeals(),
-      child: const MealPlanView(),
-    );
+    return const MealPlanView();
   }
 }
 

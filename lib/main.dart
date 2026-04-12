@@ -9,6 +9,9 @@ import 'package:family_assistant/features/settings/cubit/settings_cubit.dart';
 import 'package:family_assistant/features/auth/cubit/auth_cubit.dart';
 import 'package:family_assistant/features/health/cubit/health_dashboard_cubit.dart';
 import 'package:family_assistant/features/home/screens/home_screen.dart';
+import 'package:family_assistant/features/iot/cubit/iot_cubit.dart';
+import 'package:family_assistant/features/meal_planning/cubit/meal_plan_cubit.dart';
+import 'package:family_assistant/features/shopping_schedule/cubit/shopping_schedule_cubit.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,11 +38,14 @@ class MyApp extends StatelessWidget {
         BlocProvider(create: (context) => SettingsCubit()),
         BlocProvider(create: (context) => AuthCubit()..initialize()),
         BlocProvider(create: (context) => HealthDashboardCubit()),
+        BlocProvider(create: (context) => IotCubit()),
+        BlocProvider(create: (context) => MealPlanCubit()..loadMeals()),
+        BlocProvider(create: (context) => ShoppingScheduleCubit()..initialize()),
       ],
       child: BlocBuilder<SettingsCubit, SettingsState>(
         builder: (context, state) {
           return MaterialApp(
-            title: 'Family Assistant',
+            title: 'iMate',
             debugShowCheckedModeBanner: false,
             themeMode: state.isDarkMode ? ThemeMode.dark : ThemeMode.light,
             theme: ThemeData(
@@ -65,7 +71,7 @@ class AuthWrapper extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<AuthCubit, AuthState>(
       builder: (context, state) {
-        if (state.status == AuthStatus.initial || state.status == AuthStatus.loading) {
+        if (state.status == AuthStatus.initial) {
           return const Scaffold(
             body: Center(
               child: CircularProgressIndicator(color: Color(0xFF0D6CF2)),

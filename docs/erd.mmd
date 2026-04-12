@@ -1,0 +1,122 @@
+erDiagram
+    USER_PROFILE {
+        string uid PK
+        string email
+        string displayName
+        string photoUrl
+        string gender
+        boolean emailVerified
+        datetime updatedAt
+    }
+
+    HEALTH_DATA {
+        string date PK
+        string userUid FK
+        int steps
+        int stepGoal
+        float sleepHours
+        float waterLiters
+        int calories
+        int caloriesGoal
+        int protein
+        int proteinGoal
+        int carbs
+        int fat
+        int activityMinutes
+        int activityGoal
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    HEALTH_LOG {
+        string id PK
+        string userUid FK
+        string type
+        datetime date
+        datetime bedtime
+        datetime wakeup
+        boolean isConfirmed
+        string qualityTag
+        datetime startTime
+        string sessions
+        int currentLevel
+        datetime createdAt
+    }
+
+    MEAL_PLAN {
+        string date PK
+        string userUid FK
+        int totalCalories
+        json meals
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    MEAL_ITEM {
+        string id PK
+        string mealPlanDate FK
+        string slot
+        string name
+        string description
+        int calories
+        int protein
+        int carbs
+        int fats
+        string imageUrl
+        string imagePrompt
+        string ingredients
+        string instructions
+        datetime date
+        datetime createdAt
+    }
+
+    WALLET {
+        string id PK
+        string name
+        double balance
+        boolean isVirtual
+        datetime createdAt
+    }
+
+    EXPENSE {
+        string id PK
+        double amount
+        string category
+        string type
+        string source
+        string walletId FK
+        string note
+        datetime createdAt
+    }
+
+    SHOPPING_SCHEDULE {
+        string id PK
+        string title
+        double amount
+        string category
+        datetime dueDate
+        string paymentMode
+        string status
+        string walletId FK
+        string repeatCycle
+        string notes
+        datetime createdAt
+    }
+
+    CATEGORY_BUDGET {
+        string id PK
+        string name
+        double monthlyBudget
+        double totalSpent
+        datetime updatedAt
+    }
+
+    USER_PROFILE ||--o{ HEALTH_DATA : owns
+    USER_PROFILE ||--o{ HEALTH_LOG : owns
+    USER_PROFILE ||--o{ MEAL_PLAN : owns
+    MEAL_PLAN ||--o{ MEAL_ITEM : embeds
+
+    WALLET ||--o{ EXPENSE : referenced_by
+    WALLET ||--o{ SHOPPING_SCHEDULE : linked_to
+
+    CATEGORY_BUDGET o{--o{ EXPENSE : category_name_match

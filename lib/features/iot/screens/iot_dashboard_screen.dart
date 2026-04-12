@@ -9,10 +9,7 @@ class IotDashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider<IotCubit>(
-      create: (_) => IotCubit(),
-      child: const IotDashboardView(),
-    );
+    return const IotDashboardView();
   }
 }
 
@@ -36,7 +33,7 @@ class IotDashboardView extends StatelessWidget {
         bottom: false,
         child: Column(
           children: [
-            _buildHeader(textColor, isDarkMode),
+            _buildHeader(context, textColor, isDarkMode),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.only(bottom: 100),
@@ -67,13 +64,16 @@ class IotDashboardView extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader(Color textColor, bool isDarkMode) {
+  Widget _buildHeader(BuildContext context, Color textColor, bool isDarkMode) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          _buildNeuIconBtn(Icons.arrow_back_ios_new, primaryColor, isDarkMode),
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: _buildNeuIconBtn(Icons.arrow_back_ios_new, primaryColor, isDarkMode),
+          ),
           Text(
             'Smart Home',
             style: GoogleFonts.manrope(

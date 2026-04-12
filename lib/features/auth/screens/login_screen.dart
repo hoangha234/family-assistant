@@ -57,7 +57,6 @@ class _LoginViewState extends State<LoginView> {
             MaterialPageRoute(builder: (context) => const HomeScreen()),
           );
         }
-        // Handle error - show SnackBar
         if (state.hasError && state.errorMessage != null) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -66,7 +65,10 @@ class _LoginViewState extends State<LoginView> {
               behavior: SnackBarBehavior.floating,
             ),
           );
-          context.read<AuthCubit>().clearError();
+          
+          if (state.errorMessage!.toLowerCase().contains('password')) {
+            _passwordController.clear();
+          }
         }
       },
       child: Scaffold(
@@ -165,7 +167,7 @@ class _LoginViewState extends State<LoginView> {
                   const SizedBox(height: 24),
                   // Text Title
                   const Text(
-                    'Family Assistant',
+                    'iMate',
                     style: TextStyle(
                       fontSize: 30,
                       fontWeight: FontWeight.bold,
@@ -175,7 +177,7 @@ class _LoginViewState extends State<LoginView> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Smart living for modern families',
+                    'Your smart personal assistant',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
@@ -198,6 +200,18 @@ class _LoginViewState extends State<LoginView> {
   Widget _buildFormContainer() {
     return BlocBuilder<AuthCubit, AuthState>(
       builder: (context, state) {
+        String? emailError;
+        String? passwordError;
+
+        if (state.hasError && state.errorMessage != null) {
+          final msg = state.errorMessage!.toLowerCase();
+          if (msg.contains('password')) {
+            passwordError = 'Wrong password, please try again!';
+          } else if (msg.contains('email') || msg.contains('user')) {
+            emailError = state.errorMessage;
+          }
+        }
+
         return SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 32.0),
           child: Column(
@@ -208,6 +222,7 @@ class _LoginViewState extends State<LoginView> {
                 label: 'Email Address',
                 hint: 'name@example.com',
                 icon: Icons.mail_outline_rounded,
+                errorText: emailError,
               ),
               const SizedBox(height: 20),
               _buildTextField(
@@ -216,6 +231,7 @@ class _LoginViewState extends State<LoginView> {
                 hint: '••••••••',
                 icon: Icons.lock_outline_rounded,
                 isPassword: true,
+                errorText: passwordError,
               ),
               const SizedBox(height: 12),
 
@@ -223,9 +239,7 @@ class _LoginViewState extends State<LoginView> {
               Align(
                 alignment: Alignment.centerRight,
                 child: InkWell(
-                  onTap: () {
-                    // TODO: Navigate to forgot password screen
-                  },
+                  onTap: () => _showForgotPasswordDialog(context),
                   child: Text(
                     'Forgot Password?',
                     style: TextStyle(
@@ -366,13 +380,13 @@ class _LoginViewState extends State<LoginView> {
     );
   }
 
-  // --- WIDGET INPUT TEXT ---
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
     required String hint,
     required IconData icon,
     bool isPassword = false,
+    String? errorText,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -405,7 +419,13 @@ class _LoginViewState extends State<LoginView> {
             controller: controller,
             obscureText: isPassword && !_isPasswordVisible,
             style: TextStyle(color: slate800, fontSize: 16),
+            onChanged: (value) {
+              if (context.read<AuthCubit>().state.hasError) {
+                context.read<AuthCubit>().clearError();
+              }
+            },
             decoration: InputDecoration(
+              errorText: errorText,
               hintText: hint,
               hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
               prefixIcon: Padding(
@@ -435,6 +455,14 @@ class _LoginViewState extends State<LoginView> {
                 borderRadius: BorderRadius.circular(30),
                 borderSide:
                     BorderSide(color: accentSage.withOpacity(0.5), width: 2),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(30),
+                borderSide: const BorderSide(color: Colors.red, width: 2),
+              ),
+              focusedErrorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(30),
+                borderSide: const BorderSide(color: Colors.red, width: 2),
               ),
               contentPadding:
                   const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
@@ -502,6 +530,76 @@ class _LoginViewState extends State<LoginView> {
           ],
         ),
       ),
+    );
+  }
+
+  void _showForgotPasswordDialog(BuildContext context) {
+    final TextEditingController resetEmailController = TextEditingController(text: _emailController.text);
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Reset Password', style: TextStyle(fontWeight: FontWeight.bold)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Enter your email address to receive a password reset link.', style: TextStyle(fontSize: 14)),
+              const SizedBox(height: 16),
+              TextField(
+                controller: resetEmailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: InputDecoration(
+                  hintText: 'name@example.com',
+                  prefixIcon: const Icon(Icons.mail_outline_rounded),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+              },
+              child: Text('Cancel', style: TextStyle(color: slate500)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final email = resetEmailController.text.trim();
+                Navigator.pop(dialogContext);
+                if (email.isNotEmpty) {
+                  context.read<AuthCubit>().sendPasswordReset(email);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('If the email is registered, a password reset link has been sent.'),
+                      backgroundColor: Colors.green,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please enter an email address'),
+                      backgroundColor: Colors.red,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              ),
+              child: const Text('Send'),
+            ),
+          ],
+        );
+      },
     );
   }
 }

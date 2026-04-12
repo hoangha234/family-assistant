@@ -1,0 +1,471 @@
+classDiagram
+    direction LR
+
+    class MyApp {
+        +build(context)
+    }
+
+    class AuthWrapper {
+        +build(context)
+    }
+
+    class HomeScreen {
+        +build(context)
+    }
+
+    class SettingsCubit {
+        +toggleDarkMode(value)
+        +toggleNotifications(value)
+    }
+
+    class HomeCubit {
+        +setTab(index)
+    }
+
+    class AuthCubit {
+        -AuthService _authService
+        +initialize()
+        +login(email, password)
+        +loginWithGoogle()
+        +register(email, password, displayName)
+        +updateProfile()
+        +signOut()
+    }
+
+    class AuthService {
+        +loginWithEmailAndPassword()
+        +registerWithEmailAndPassword()
+        +loginWithGoogle()
+        +updateUserProfile()
+        +signOut()
+        +getUserGender(uid)
+    }
+
+    class UserModel {
+        +uid
+        +email
+        +displayName
+        +photoUrl
+        +gender
+        +emailVerified
+    }
+
+    class WalletCubit {
+        -WalletRepository _repository
+        +loadWallets()
+        +addWallet()
+        +updateWalletName()
+        +adjustBalance()
+        +deleteWallet()
+        +selectWallet()
+    }
+
+    class WalletRepository {
+        +watchWallets()
+        +addWallet(wallet)
+        +updateWalletName()
+        +adjustBalance()
+        +deductBalance()
+        +addBalance()
+        +deleteWallet()
+        +getWalletById()
+    }
+
+    class WalletModel {
+        +id
+        +name
+        +balance
+        +isVirtual
+        +createdAt
+    }
+
+    class ExpenseCubit {
+        -ExpenseService _expenseService
+        +initialize()
+        +refresh()
+    }
+
+    class AddExpenseCubit {
+        -ExpenseService _expenseService
+        -CategoryBudgetCubit _categoryBudgetCubit
+        +setTransactionType()
+        +setCategory()
+        +setWalletId()
+        +confirmTransaction()
+    }
+
+    class ReportCubit {
+        -ExpenseService _expenseService
+        +initialize()
+        +setTimeframe()
+        +loadReport()
+    }
+
+    class CategoryBudgetCubit {
+        -CategoryBudgetService _service
+        +initialize()
+        +updateCategoryBudget()
+        +recalculateAllCategories()
+        +onExpenseAdded()
+        +addCategory()
+        +deleteCategory()
+    }
+
+    class ExpenseService {
+        +streamExpenses()
+        +createExpense(expense)
+        +updateExpense(expense)
+        +deleteExpense(id)
+        +fetchAllExpenses()
+        +fetchExpensesByWeek()
+        +fetchExpensesByMonth()
+        +fetchExpensesByYear()
+    }
+
+    class CategoryBudgetService {
+        +streamCategoryBudgets()
+        +fetchAllCategoryBudgets()
+        +createCategoryBudget()
+        +updateCategoryBudget()
+        +syncCategoryBudgetsWithExpenses()
+        +initializeDefaultCategories()
+    }
+
+    class Expense {
+        +id
+        +amount
+        +category
+        +type
+        +source
+        +walletId
+        +createdAt
+        +note
+    }
+
+    class CategoryBudget {
+        +id
+        +name
+        +monthlyBudget
+        +totalSpent
+        +updatedAt
+    }
+
+    class ShoppingScheduleCubit {
+        -ShoppingService _shoppingService
+        -WalletRepository _walletRepository
+        -ExpenseService _expenseService
+        +initialize()
+        +loadSchedules()
+        +processManualPurchase()
+        +markAsPaidManually()
+        +resetFailedSchedule()
+    }
+
+    class AddScheduleCubit {
+        -ShoppingService _shoppingService
+        -WalletRepository _walletRepository
+        -ExpenseService _expenseService
+        +updateName()
+        +updateCost()
+        +updateCategory()
+        +updatePaymentMode()
+        +saveItem()
+    }
+
+    class ShoppingService {
+        +fetchAllSchedules()
+        +watchAllSchedules()
+        +createSchedule(schedule)
+        +updateSchedule()
+        +deleteSchedule()
+        +processAutomaticPaymentTransaction()
+        +markAsPaidWithRecurrence()
+        +createNextMonthlySchedule()
+    }
+
+    class ShoppingSchedule {
+        +id
+        +title
+        +amount
+        +category
+        +dueDate
+        +paymentMode
+        +status
+        +walletId
+        +repeatCycle
+        +notes
+        +createdAt
+    }
+
+    class HealthDashboardCubit {
+        -HealthService _healthService
+        +loadTodayData()
+        +startStepTracking()
+        +scanMeal()
+        +scanMealFromGallery()
+        +updateWater()
+        +updateSleep()
+        +updateActivity()
+    }
+
+    class SleepCubit {
+        -SleepService _sleepService
+        +saveSchedule()
+        +confirmSleep()
+        +deleteTodayData()
+    }
+
+    class HydrationCubit {
+        -HydrationService _hydrationService
+        +confirmDrink()
+        +updateStartTime()
+        +loadRecentLogs()
+    }
+
+    class HealthService {
+        +startStepTracking()
+        +stopStepTracking()
+        +analyzeFoodImage(imageFile)
+        +loadDailyHealthData()
+        +updateHealthData()
+        +addNutritionForDate()
+        +streamTodayHealthData()
+    }
+
+    class SleepService {
+        +streamSleepData(date)
+        +saveSleepSchedule()
+        +confirmSleep()
+        +loadSleepHistory()
+        +deleteTodayData()
+    }
+
+    class HydrationService {
+        +getOrCreateTodayPlan()
+        +streamTodayPlan()
+        +updateCurrentLevel()
+        +updateStartTime()
+        +getRecentLogs()
+    }
+
+    class HealthData {
+        +date
+        +steps
+        +sleepHours
+        +waterLiters
+        +calories
+        +protein
+        +carbs
+        +fat
+        +activityMinutes
+    }
+
+    class SleepData {
+        +id
+        +bedtime
+        +wakeup
+        +isConfirmed
+        +qualityTag
+        +date
+    }
+
+    class HydrationLog {
+        +id
+        +date
+        +startTime
+        +sessions
+        +currentLevel
+    }
+
+    class FoodAnalysis {
+        +foodName
+        +calories
+        +protein
+        +carbs
+        +fat
+        +analyzedAt
+    }
+
+    class MealPlanCubit {
+        -MealService _mealService
+        +loadMeals()
+        +selectDate()
+        +setMealType()
+        +getMealSuggestion()
+        +addGeneratedMealToToday()
+        +deleteMeal()
+    }
+
+    class MealDetailCubit {
+        +initIngredients()
+        +toggleIngredient()
+        +checkAllIngredients()
+        +uncheckAllIngredients()
+    }
+
+    class MealService {
+        -AIService _aiService
+        -VertexAIService _vertexAIService
+        +generateMealFromAI()
+        +getMealsForDate()
+        +saveMealToDate()
+        +deleteMealFromDate()
+        +getMealHistory()
+    }
+
+    class VertexAIService {
+        +generateMealText(prompt)
+        +generateMealImage(prompt)
+        +healthCheck()
+    }
+
+    class MealPlanDocument {
+        +date
+        +totalCalories
+        +meals
+        +createdAt
+    }
+
+    class MealModel {
+        +id
+        +name
+        +description
+        +type
+        +calories
+        +protein
+        +carbs
+        +fats
+        +ingredients
+        +instructions
+        +imageUrl
+        +imagePrompt
+        +date
+        +createdAt
+    }
+
+    class IngredientItem {
+        +raw
+        +displayText
+        +isChecked
+    }
+
+    class AiAssistantCubit {
+        -AIService _aiService
+        +sendMessage(message)
+        +sendSuggestion()
+        +clearChat()
+    }
+
+    class AIService {
+        +sendMessage(messages)
+        +sendMessageWithImage(messages, image)
+        +generateImage(prompt)
+        +analyzeImage(base64Image)
+        +resetFallback()
+    }
+
+    class MessageModel {
+        +id
+        +content
+        +role
+        +timestamp
+    }
+
+    class IotCubit {
+        -MqttService _mqttService
+        +initialize()
+        +toggleLed()
+        +toggleFan()
+    }
+
+    class DeviceDetailCubit {
+        -MqttService _mqttService
+        +togglePower()
+        +updateBrightness()
+        +updateColor()
+        +toggleLed()
+        +toggleFan()
+    }
+
+    class IotDashboardCubit {
+        +toggleLight()
+        +toggleAC()
+        +toggleTV()
+        +toggleCamera()
+        +toggleThermostat()
+        +togglePlug()
+    }
+
+    class MqttService {
+        +connect()
+        +disconnect()
+        +publishLed(isOn)
+        +publishFan(isOn)
+        +messages
+    }
+
+    class MqttIncomingMessage {
+        +topic
+        +payload
+    }
+
+    MyApp --> AuthWrapper : displays
+    MyApp --> SettingsCubit : provides
+    MyApp --> AuthCubit : provides
+    MyApp --> HealthDashboardCubit : provides
+
+    AuthWrapper --> AuthCubit : listens
+    AuthWrapper --> HomeScreen : routes_to
+    HomeScreen --> HomeCubit : creates
+    HomeScreen --> ExpenseCubit : creates
+    HomeScreen ..> AuthCubit : reads
+    HomeScreen ..> HealthDashboardCubit : reads
+
+    AuthCubit --> AuthService : uses
+    AuthCubit --> UserModel : emits
+    AuthService --> UserModel : builds
+
+    WalletCubit --> WalletRepository : uses
+    WalletRepository --> WalletModel : persists
+
+    ExpenseCubit --> ExpenseService : uses
+    AddExpenseCubit --> ExpenseService : uses
+    AddExpenseCubit ..> CategoryBudgetCubit : notifies
+    ReportCubit --> ExpenseService : uses
+    CategoryBudgetCubit --> CategoryBudgetService : uses
+    ExpenseService --> Expense : persists
+    CategoryBudgetService --> CategoryBudget : persists
+
+    ShoppingScheduleCubit --> ShoppingService : uses
+    ShoppingScheduleCubit --> WalletRepository : uses
+    ShoppingScheduleCubit --> ExpenseService : uses
+    AddScheduleCubit --> ShoppingService : uses
+    AddScheduleCubit --> WalletRepository : uses
+    AddScheduleCubit --> ExpenseService : uses
+    ShoppingService --> ShoppingSchedule : persists
+    ShoppingScheduleCubit ..> Expense : creates
+    AddScheduleCubit ..> Expense : creates
+
+    HealthDashboardCubit --> HealthService : uses
+    SleepCubit --> SleepService : uses
+    HydrationCubit --> HydrationService : uses
+    HydrationCubit ..> HealthService : syncs
+    HealthService --> HealthData : persists
+    HealthService --> FoodAnalysis : creates
+    SleepService --> SleepData : persists
+    HydrationService --> HydrationLog : persists
+
+    MealPlanCubit --> MealService : uses
+    MealPlanCubit ..> HealthService : syncs_nutrition
+    MealDetailCubit --> IngredientItem : manages
+    MealService --> MealPlanDocument : persists
+    MealService --> MealModel : persists
+    MealService --> AIService : uses
+    MealService --> VertexAIService : uses
+
+    AiAssistantCubit --> AIService : uses
+    AIService --> MessageModel : consumes
+
+    IotCubit --> MqttService : uses
+    DeviceDetailCubit --> MqttService : uses
+    MqttService --> MqttIncomingMessage : streams

@@ -10,8 +10,14 @@ import '../../expense/screens/expense_screen.dart';
 import '../../expense/cubit/expense_cubit.dart';
 import '../../shopping_schedule/screens/shopping_schedule_screen.dart';
 import '../../meal_planning/screens/meal_plan_screen.dart';
+import '../../meal_planning/cubit/meal_plan_cubit.dart';
+import '../../meal_planning/models/meal_model.dart';
+import '../../shopping_schedule/cubit/shopping_schedule_cubit.dart';
+import '../../shopping_schedule/services/shopping_service.dart';
 import '../../iot/screens/iot_dashboard_screen.dart';
+import '../../iot/cubit/iot_cubit.dart';
 import '../../health/screens/health_dashboard_screen.dart';
+import '../../health/cubit/health_dashboard_cubit.dart';
 import '../../wallet/screens/wallet_screen.dart';
 import '../../auth/cubit/auth_cubit.dart';
 
@@ -120,7 +126,7 @@ class HomeView extends StatelessWidget {
             const SizedBox(height: 24),
             _buildQuickActions(context),
             const SizedBox(height: 24),
-            _buildWidgetGrid(),
+            _buildWidgetGrid(context),
           ],
         ),
       ),
@@ -514,7 +520,7 @@ class HomeView extends StatelessWidget {
     );
   }
 
-  Widget _buildWidgetGrid() {
+  Widget _buildWidgetGrid(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
@@ -526,94 +532,149 @@ class HomeView extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Container(
+                child: SizedBox(
                   height: 220,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    image: const DecorationImage(
-                      image: NetworkImage('https://images.unsplash.com/photo-1554672408-730436b60dde?q=80&w=300&auto=format&fit=crop'),
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [Colors.transparent, Colors.black.withOpacity(0.8)],
-                      ),
-                    ),
-                    padding: const EdgeInsets.all(16),
-                    child: const Column(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.restaurant, color: Colors.white, size: 16),
-                            SizedBox(width: 4),
-                            Text('DINNER', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                        SizedBox(height: 4),
-                        Text('Grilled Salmon & Veggies',
-                            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, height: 1.1)),
-                        SizedBox(height: 4),
-                        Text('7:00 PM', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                      ],
-                    ),
+                  child: BlocBuilder<MealPlanCubit, MealPlanState>(
+                    builder: (context, state) {
+                      final mealTypes = [MealType.breakfast, MealType.lunch, MealType.dinner];
+                      final typeLabels = ['BREAKFAST', 'LUNCH', 'DINNER'];
+                      final times = ['8:00 AM', '12:30 PM', '7:00 PM'];
+                      
+                      return PageView.builder(
+                        controller: PageController(initialPage: 3000), // Start with Breakfast
+                        itemBuilder: (context, index) {
+                          final typeIndex = index % 3;
+                          final mealType = mealTypes[typeIndex];
+                          final meal = state.getMealByType(mealType);
+                          
+                          final title = meal?.name ?? 'Not Planned';
+                          
+                          ImageProvider? imageProvider;
+                          if (meal != null) {
+                            if (meal.imageBytes != null && meal.imageBytes!.isNotEmpty) {
+                              imageProvider = MemoryImage(meal.imageBytes!);
+                            } else if (meal.imageUrl.isNotEmpty) {
+                              imageProvider = NetworkImage(meal.imageUrl);
+                            }
+                          }
+                          if (imageProvider == null) {
+                            imageProvider = const NetworkImage('https://images.unsplash.com/photo-1495147466023-ac5c588e2e94?q=80&w=300&auto=format&fit=crop');
+                          }
+                          
+                          return Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16),
+                              image: DecorationImage(
+                                image: imageProvider,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(16),
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [Colors.transparent, Colors.black.withOpacity(0.8)],
+                                ),
+                              ),
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.restaurant, color: Colors.white, size: 16),
+                                      const SizedBox(width: 4),
+                                      Text(typeLabels[typeIndex], style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(title,
+                                      style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, height: 1.1)),
+                                  const SizedBox(height: 4),
+                                  Text(times[typeIndex], style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    },
                   ),
                 ),
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: Container(
-                  height: 220,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4)],
-                  ),
-                  child: Column(
-                    children: [
-                      const Row(
-                        children: [
-                          Icon(Icons.directions_walk, color: Colors.redAccent, size: 18),
-                          SizedBox(width: 4),
-                          Text('Steps', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
-                        ],
+                child: BlocBuilder<HealthDashboardCubit, HealthDashboardState>(
+                  builder: (context, healthState) {
+                    final steps = healthState.steps;
+                    final goal = healthState.stepGoal;
+                    final progress = healthState.stepProgress;
+
+                    // Format steps: e.g. 6400 -> "6.4k", 850 -> "850"
+                    String formattedSteps;
+                    if (steps >= 1000) {
+                      formattedSteps = '${(steps / 1000).toStringAsFixed(1)}k';
+                    } else {
+                      formattedSteps = steps.toString();
+                    }
+
+                    // Format goal: e.g. 10000 -> "10,000"
+                    final formattedGoal = goal.toString().replaceAllMapped(
+                      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+                      (Match m) => '${m[1]},',
+                    );
+
+                    return Container(
+                      height: 220,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4)],
                       ),
-                      Expanded(
-                        child: Center(
-                          child: Stack(
-                            alignment: Alignment.center,
+                      child: Column(
+                        children: [
+                          const Row(
                             children: [
-                              const SizedBox(
-                                width: 100,
-                                height: 100,
-                                child: CircularProgressIndicator(
-                                  value: 0.64,
-                                  strokeWidth: 8,
-                                  backgroundColor: Color(0xFFF3F4F6),
-                                  color: Color(0xFF0D6CF2),
-                                  strokeCap: StrokeCap.round,
-                                ),
-                              ),
-                              Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text('6.4k', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                                ],
-                              )
+                              Icon(Icons.directions_walk, color: Colors.redAccent, size: 18),
+                              SizedBox(width: 4),
+                              Text('Steps', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
                             ],
                           ),
-                        ),
+                          Expanded(
+                            child: Center(
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  SizedBox(
+                                    width: 100,
+                                    height: 100,
+                                    child: CircularProgressIndicator(
+                                      value: progress,
+                                      strokeWidth: 8,
+                                      backgroundColor: const Color(0xFFF3F4F6),
+                                      color: const Color(0xFF0D6CF2),
+                                      strokeCap: StrokeCap.round,
+                                    ),
+                                  ),
+                                  Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(formattedSteps, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                                    ],
+                                  )
+                                ],
+                              ),
+                            ),
+                          ),
+                          Text('Goal: $formattedGoal', style: TextStyle(fontSize: 12, color: Colors.grey[500], fontWeight: FontWeight.w500)),
+                        ],
                       ),
-                      Text('Goal: 10,000', style: TextStyle(fontSize: 12, color: Colors.grey[500], fontWeight: FontWeight.w500)),
-                    ],
-                  ),
+                    );
+                  },
                 ),
               ),
             ],
@@ -642,13 +703,85 @@ class HomeView extends StatelessWidget {
                               const Text('To Buy', style: TextStyle(fontWeight: FontWeight.bold)),
                             ],
                           ),
-                          const Text('See all', style: TextStyle(fontSize: 10, color: Colors.blue, fontWeight: FontWeight.bold)),
+                          GestureDetector(
+                            onTap: () {
+                              // Ensure it opens on Pending tab
+                              context.read<ShoppingScheduleCubit>().setTab(0);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (context) => const ShoppingScheduleScreen()),
+                              );
+                            },
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+                              child: Text('See all', style: TextStyle(fontSize: 10, color: Colors.blue, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 12),
-                      _buildCheckItem('Milk (Whole)'),
-                      _buildCheckItem('Organic Eggs'),
-                      _buildCheckItem('AA Batteries'),
+                      Expanded(
+                        child: BlocBuilder<ShoppingScheduleCubit, ShoppingScheduleState>(
+                          builder: (context, state) {
+                            if (state.isLoading) {
+                              return const Center(child: CircularProgressIndicator());
+                            }
+                            final pendingItems = state.pendingSchedules
+                                .where((s) => s.paymentMode == PaymentMode.manual)
+                                .take(3)
+                                .toList();
+                                
+                            if (pendingItems.isEmpty) {
+                              return Center(
+                                child: Text('All caught up!', style: TextStyle(fontSize: 12, color: Colors.grey[400])),
+                              );
+                            }
+                            
+                            return Column(
+                              children: pendingItems.map((schedule) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      final cubit = context.read<ShoppingScheduleCubit>();
+                                      if (!state.isScheduleProcessing(schedule.id)) {
+                                          cubit.markAsPaidManually(schedule.id);
+                                      }
+                                    },
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 16, 
+                                          height: 16, 
+                                          decoration: BoxDecoration(
+                                            border: Border.all(color: Colors.grey[300]!), 
+                                            borderRadius: BorderRadius.circular(4),
+                                            color: Colors.white,
+                                          ),
+                                          child: state.isScheduleProcessing(schedule.id)
+                                              ? const Padding(
+                                                  padding: EdgeInsets.all(2.0),
+                                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                                )
+                                              : null,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            schedule.title, 
+                                            style: TextStyle(fontSize: 13, color: Colors.grey[700]), 
+                                            overflow: TextOverflow.ellipsis
+                                          )
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            );
+                          },
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -673,12 +806,16 @@ class HomeView extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(child: _buildHomeStatusItem(Icons.lightbulb, Colors.amber, '3 On')),
-                          const SizedBox(width: 8),
-                          Expanded(child: _buildHomeStatusItem(Icons.thermostat, Colors.blue, '72°F')),
-                        ],
+                      BlocBuilder<IotCubit, IotState>(
+                        builder: (context, iotState) {
+                          return Row(
+                            children: [
+                              Expanded(child: _buildHomeStatusItem(Icons.water_drop, Colors.blue, '${iotState.humidity.toStringAsFixed(1)}%')),
+                              const SizedBox(width: 8),
+                              Expanded(child: _buildHomeStatusItem(Icons.thermostat, Colors.orange, '${iotState.temperature.toStringAsFixed(1)}°C')),
+                            ],
+                          );
+                        },
                       ),
                       const Spacer(),
                       Text('All systems normal', style: TextStyle(fontSize: 10, color: Colors.grey[400])),

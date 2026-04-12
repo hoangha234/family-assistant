@@ -33,7 +33,9 @@ class HealthDashboardState extends Equatable {
   final int protein;
   final int proteinGoal;
   final int carbs;
+  final int carbsGoal;
   final int fat;
+  final int fatGoal;
 
   // Activity
   final int activityMinutes;
@@ -41,6 +43,13 @@ class HealthDashboardState extends Equatable {
 
   // Food scan result
   final FoodAnalysis? lastScannedFood;
+
+  // Weekly averages
+  final double weeklyAvgSleepProgress;
+  final double weeklyAvgWaterProgress;
+  final double weeklyAvgCalorieProgress;
+  final double weeklyAvgProteinProgress;
+  final double weeklyAvgStepProgress;
 
   const HealthDashboardState({
     this.status = HealthDashboardStatus.initial,
@@ -52,14 +61,21 @@ class HealthDashboardState extends Equatable {
     this.waterLiters = 1.5,
     this.waterGoal = 2.0,
     this.dailyCalories = 0,
-    this.caloriesGoal = 2200,
+    this.caloriesGoal = 2000,
     this.protein = 0,
     this.proteinGoal = 120,
     this.carbs = 0,
+    this.carbsGoal = 250,
     this.fat = 0,
+    this.fatGoal = 60,
     this.activityMinutes = 45,
     this.activityGoal = 60,
     this.lastScannedFood,
+    this.weeklyAvgSleepProgress = 0.0,
+    this.weeklyAvgWaterProgress = 0.0,
+    this.weeklyAvgCalorieProgress = 0.0,
+    this.weeklyAvgProteinProgress = 0.0,
+    this.weeklyAvgStepProgress = 0.0,
   });
 
   /// Copy with updated values
@@ -77,10 +93,17 @@ class HealthDashboardState extends Equatable {
     int? protein,
     int? proteinGoal,
     int? carbs,
+    int? carbsGoal,
     int? fat,
+    int? fatGoal,
     int? activityMinutes,
     int? activityGoal,
     FoodAnalysis? lastScannedFood,
+    double? weeklyAvgSleepProgress,
+    double? weeklyAvgWaterProgress,
+    double? weeklyAvgCalorieProgress,
+    double? weeklyAvgProteinProgress,
+    double? weeklyAvgStepProgress,
   }) {
     return HealthDashboardState(
       status: status ?? this.status,
@@ -96,10 +119,17 @@ class HealthDashboardState extends Equatable {
       protein: protein ?? this.protein,
       proteinGoal: proteinGoal ?? this.proteinGoal,
       carbs: carbs ?? this.carbs,
+      carbsGoal: carbsGoal ?? this.carbsGoal,
       fat: fat ?? this.fat,
+      fatGoal: fatGoal ?? this.fatGoal,
       activityMinutes: activityMinutes ?? this.activityMinutes,
       activityGoal: activityGoal ?? this.activityGoal,
       lastScannedFood: lastScannedFood ?? this.lastScannedFood,
+      weeklyAvgSleepProgress: weeklyAvgSleepProgress ?? this.weeklyAvgSleepProgress,
+      weeklyAvgWaterProgress: weeklyAvgWaterProgress ?? this.weeklyAvgWaterProgress,
+      weeklyAvgCalorieProgress: weeklyAvgCalorieProgress ?? this.weeklyAvgCalorieProgress,
+      weeklyAvgProteinProgress: weeklyAvgProteinProgress ?? this.weeklyAvgProteinProgress,
+      weeklyAvgStepProgress: weeklyAvgStepProgress ?? this.weeklyAvgStepProgress,
     );
   }
 
@@ -122,6 +152,12 @@ class HealthDashboardState extends Equatable {
 
   /// Calculate protein progress (0.0 to 1.0)
   double get proteinProgress => (protein / proteinGoal).clamp(0.0, 1.0);
+
+  /// Calculate carbs progress (0.0 to 1.0)
+  double get carbsProgress => (carbs / carbsGoal).clamp(0.0, 1.0);
+
+  /// Calculate fat progress (0.0 to 1.0)
+  double get fatProgress => (fat / fatGoal).clamp(0.0, 1.0);
 
   /// Calculate activity progress (0.0 to 1.0)
   double get activityProgress => (activityMinutes / activityGoal).clamp(0.0, 1.0);
@@ -153,10 +189,17 @@ class HealthDashboardState extends Equatable {
         protein,
         proteinGoal,
         carbs,
+        carbsGoal,
         fat,
+        fatGoal,
         activityMinutes,
         activityGoal,
         lastScannedFood,
+        weeklyAvgSleepProgress,
+        weeklyAvgWaterProgress,
+        weeklyAvgCalorieProgress,
+        weeklyAvgProteinProgress,
+        weeklyAvgStepProgress,
       ];
 }
 

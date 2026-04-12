@@ -1,0 +1,145 @@
+flowchart LR
+    %% Actors
+    User["Family Member"]
+    AuthProvider["Firebase Auth /<br/>Google Sign-In"]
+    FirebaseData["Firestore /<br/>Firebase Storage"]
+    AIPlatform["Gemini / Vertex AI"]
+    DeviceSensors["Phone Sensors /<br/>Camera / Gallery"]
+    IoTPlatform["MQTT Broker /<br/>IoT Devices"]
+
+    subgraph FamilyAssistant["Family Assistant"]
+        direction LR
+
+        subgraph AuthSettings["Authentication & Settings"]
+            direction TB
+            UC_Register([Register account])
+            UC_Login([Login with email])
+            UC_GoogleLogin([Login with Google])
+            UC_ResetPassword([Reset password])
+            UC_EditProfile([Edit profile])
+            UC_SyncProfile([Sync profile data])
+            UC_Settings([Change theme /<br/>notification settings])
+            UC_SignOut([Sign out])
+        end
+
+        subgraph ExpenseBudget["Expense & Budget"]
+            direction TB
+            UC_TrackExpense([Track income /<br/>expense])
+            UC_ExpenseOverview([View expense overview])
+            UC_BudgetJars([Manage budget jars])
+            UC_Reports([View financial reports])
+        end
+
+        subgraph ShoppingWallet["Shopping & Wallet"]
+            direction TB
+            UC_CreateSchedule([Create shopping schedule])
+            UC_ViewSchedule([Track pending /<br/>completed schedules])
+            UC_MarkPurchased([Mark schedule as<br/>purchased])
+            UC_ManageWallet([Manage wallets])
+            UC_AutoPay([Auto-deduct wallet for<br/>automatic payment])
+        end
+
+        subgraph MealHealth["Meal Planning & Health"]
+            direction TB
+            UC_GenerateMeal([Generate meal with AI])
+            UC_SaveMeal([Save meal plan by date])
+            UC_ViewMealHistory([View meal history /<br/>meal detail])
+            UC_DeleteMeal([Delete meal and sync<br/>nutrition])
+            UC_TrackSteps([Track steps automatically])
+            UC_UpdateHealth([Update water / sleep /<br/>activity data])
+            UC_ScanFood([Scan food image for<br/>nutrition estimate])
+            UC_ViewHealth([View health dashboard /<br/>weekly report])
+        end
+
+        subgraph AIAssistant["AI Assistant"]
+            direction TB
+            UC_ChatAI([Chat with family AI<br/>assistant])
+        end
+
+        subgraph SmartHome["Smart Home IoT"]
+            direction TB
+            UC_ControlIoT([Toggle light / fan])
+            UC_MonitorIoT([Monitor temperature /<br/>humidity])
+        end
+    end
+
+    User --> UC_Register
+    User --> UC_Login
+    User --> UC_GoogleLogin
+    User --> UC_ResetPassword
+    User --> UC_EditProfile
+    User --> UC_Settings
+    User --> UC_SignOut
+
+    User --> UC_TrackExpense
+    User --> UC_ExpenseOverview
+    User --> UC_BudgetJars
+    User --> UC_Reports
+
+    User --> UC_CreateSchedule
+    User --> UC_ViewSchedule
+    User --> UC_MarkPurchased
+    User --> UC_ManageWallet
+
+    User --> UC_GenerateMeal
+    User --> UC_SaveMeal
+    User --> UC_ViewMealHistory
+    User --> UC_DeleteMeal
+    User --> UC_TrackSteps
+    User --> UC_UpdateHealth
+    User --> UC_ScanFood
+    User --> UC_ViewHealth
+
+    User --> UC_ChatAI
+
+    User --> UC_ControlIoT
+    User --> UC_MonitorIoT
+
+    UC_EditProfile -. "<<include>>" .-> UC_SyncProfile
+    UC_MarkPurchased -. "<<extend>>" .-> UC_ViewSchedule
+    UC_AutoPay -. "<<include>>" .-> UC_ManageWallet
+
+    UC_Register --> AuthProvider
+    UC_Login --> AuthProvider
+    UC_GoogleLogin --> AuthProvider
+    UC_ResetPassword --> AuthProvider
+    UC_SignOut --> AuthProvider
+
+    UC_SyncProfile --> FirebaseData
+    UC_TrackExpense --> FirebaseData
+    UC_ExpenseOverview --> FirebaseData
+    UC_BudgetJars --> FirebaseData
+    UC_Reports --> FirebaseData
+    UC_CreateSchedule --> FirebaseData
+    UC_ViewSchedule --> FirebaseData
+    UC_MarkPurchased --> FirebaseData
+    UC_ManageWallet --> FirebaseData
+    UC_AutoPay --> FirebaseData
+    UC_SaveMeal --> FirebaseData
+    UC_ViewMealHistory --> FirebaseData
+    UC_DeleteMeal --> FirebaseData
+    UC_TrackSteps --> FirebaseData
+    UC_UpdateHealth --> FirebaseData
+    UC_ViewHealth --> FirebaseData
+
+    UC_GenerateMeal --> AIPlatform
+    UC_ScanFood --> AIPlatform
+    UC_ChatAI --> AIPlatform
+
+    UC_TrackSteps --> DeviceSensors
+    UC_ScanFood --> DeviceSensors
+
+    UC_ControlIoT --> IoTPlatform
+    UC_MonitorIoT --> IoTPlatform
+
+    classDef actor fill:#FFFFFF,stroke:#111418,stroke-width:2px,color:#111418;
+    classDef usecase fill:#F8FBFF,stroke:#2B7CEE,stroke-width:1.5px,color:#111418;
+    classDef system fill:#FFFFFF,stroke:#617289,stroke-width:1.5px,color:#111418;
+
+    class User actor;
+    class AuthProvider,FirebaseData,AIPlatform,DeviceSensors,IoTPlatform system;
+    class UC_Register,UC_Login,UC_GoogleLogin,UC_ResetPassword,UC_EditProfile,UC_SyncProfile,UC_Settings,UC_SignOut usecase;
+    class UC_TrackExpense,UC_ExpenseOverview,UC_BudgetJars,UC_Reports usecase;
+    class UC_CreateSchedule,UC_ViewSchedule,UC_MarkPurchased,UC_ManageWallet,UC_AutoPay usecase;
+    class UC_GenerateMeal,UC_SaveMeal,UC_ViewMealHistory,UC_DeleteMeal,UC_TrackSteps,UC_UpdateHealth,UC_ScanFood,UC_ViewHealth usecase;
+    class UC_ChatAI,UC_ControlIoT,UC_MonitorIoT usecase;

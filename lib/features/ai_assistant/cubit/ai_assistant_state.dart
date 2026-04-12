@@ -35,7 +35,7 @@ class AiAssistantInitial extends AiAssistantState {
       : super(
           messages: [
             MessageModel.assistant(
-              "Hello! I'm your Family Assistant. How can I help you manage the household today?",
+              "Hello! I'm iMate, your personal assistant. How can I help you today?",
             ),
           ],
         );
