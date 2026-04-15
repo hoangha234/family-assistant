@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../cubit/ai_assistant_cubit.dart';
 import '../../auth/cubit/auth_cubit.dart';
+import '../../home/cubit/home_cubit.dart';
 
 class AiAssistantScreen extends StatelessWidget {
   const AiAssistantScreen({super.key});
@@ -162,7 +163,7 @@ class _AiAssistantViewState extends State<AiAssistantView> {
       child: Row(
         children: [
           GestureDetector(
-            onTap: () => Navigator.of(context).pop(),
+            onTap: () => context.read<HomeCubit>().setTab(0),
             child: Icon(Icons.arrow_back_ios, color: textColor, size: 20),
           ),
           Expanded(

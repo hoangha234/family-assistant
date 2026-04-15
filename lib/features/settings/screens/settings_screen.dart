@@ -7,6 +7,7 @@ import '../../home/cubit/home_cubit.dart';
 import '../../auth/cubit/auth_cubit.dart';
 import '../../auth/screens/login_screen.dart';
 import '../../iot/screens/iot_dashboard_screen.dart';
+import '../../health/screens/health_report_screen.dart';
 import 'edit_profile_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -15,9 +16,7 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MultiBlocProvider(
-      providers: [
-        BlocProvider(create: (context) => AuthCubit()..initialize()),
-      ],
+      providers: [BlocProvider(create: (context) => AuthCubit()..initialize())],
       child: const SettingsView(),
     );
   }
@@ -38,7 +37,9 @@ class SettingsView extends StatelessWidget {
     final backgroundColor = isDarkMode ? bgDark : bgLight;
     final cardColor = isDarkMode ? const Color(0xFF1A2737) : Colors.white;
     final textColor = isDarkMode ? Colors.white : textDark;
-    final borderColor = isDarkMode ? Colors.white.withOpacity(0.1) : Colors.grey[200]!;
+    final borderColor = isDarkMode
+        ? Colors.white.withOpacity(0.1)
+        : Colors.grey[200]!;
 
     return BlocBuilder<SettingsCubit, SettingsState>(
       builder: (context, state) {
@@ -62,11 +63,18 @@ class SettingsView extends StatelessWidget {
                           children: [
                             _buildSettingsTile(
                               icon: Icons.favorite,
-                              title: "Health Data Integration",
-                              subtitle: "Sync with Apple Health",
+                              title: "Health Data",
                               textColor: textColor,
                               showBorder: true,
                               borderColor: borderColor,
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const HealthReportScreen(),
+                                  ),
+                                );
+                              },
                             ),
                             _buildSettingsTile(
                               icon: Icons.person,
@@ -98,7 +106,9 @@ class SettingsView extends StatelessWidget {
                               icon: Icons.dark_mode,
                               title: "Dark Mode",
                               value: state.isDarkMode,
-                              onChanged: (val) => context.read<SettingsCubit>().toggleDarkMode(val),
+                              onChanged: (val) => context
+                                  .read<SettingsCubit>()
+                                  .toggleDarkMode(val),
                               textColor: textColor,
                             ),
                           ],
@@ -111,7 +121,6 @@ class SettingsView extends StatelessWidget {
                             _buildSettingsTile(
                               icon: Icons.hub,
                               title: "IoT Device Management",
-                              subtitle: "3 devices connected",
                               textColor: textColor,
                               showBorder: false,
                               borderColor: borderColor,
@@ -135,7 +144,9 @@ class SettingsView extends StatelessWidget {
                               icon: Icons.notifications,
                               title: "Push Notifications",
                               value: state.pushNotifications,
-                              onChanged: (val) => context.read<SettingsCubit>().toggleNotifications(val),
+                              onChanged: (val) => context
+                                  .read<SettingsCubit>()
+                                  .toggleNotifications(val),
                               textColor: textColor,
                               showBorder: false,
                               borderColor: borderColor,
@@ -155,7 +166,9 @@ class SettingsView extends StatelessWidget {
                                   builder: (context) => AlertDialog(
                                     title: Text(
                                       'Sign Out',
-                                      style: GoogleFonts.manrope(fontWeight: FontWeight.bold),
+                                      style: GoogleFonts.manrope(
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                     content: Text(
                                       'Are you sure you want to sign out?',
@@ -163,14 +176,18 @@ class SettingsView extends StatelessWidget {
                                     ),
                                     actions: [
                                       TextButton(
-                                        onPressed: () => Navigator.pop(context, false),
+                                        onPressed: () =>
+                                            Navigator.pop(context, false),
                                         child: Text(
                                           'Cancel',
-                                          style: GoogleFonts.manrope(color: Colors.grey),
+                                          style: GoogleFonts.manrope(
+                                            color: Colors.grey,
+                                          ),
                                         ),
                                       ),
                                       TextButton(
-                                        onPressed: () => Navigator.pop(context, true),
+                                        onPressed: () =>
+                                            Navigator.pop(context, true),
                                         child: Text(
                                           'Sign Out',
                                           style: GoogleFonts.manrope(
@@ -191,24 +208,37 @@ class SettingsView extends StatelessWidget {
                                   if (context.mounted) {
                                     Navigator.pushAndRemoveUntil(
                                       context,
-                                      MaterialPageRoute(builder: (context) => const LoginScreen()),
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            const LoginScreen(),
+                                      ),
                                       (route) => false,
                                     );
                                   }
                                 }
                               },
                               style: TextButton.styleFrom(
-                                backgroundColor: isDarkMode ? Colors.red.withOpacity(0.2) : const Color(0xFFFEF2F2),
+                                backgroundColor: isDarkMode
+                                    ? Colors.red.withOpacity(0.2)
+                                    : const Color(0xFFFEF2F2),
                                 foregroundColor: Colors.red,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  side: BorderSide(color: isDarkMode ? Colors.red.withOpacity(0.3) : const Color(0xFFFEE2E2)),
+                                  side: BorderSide(
+                                    color: isDarkMode
+                                        ? Colors.red.withOpacity(0.3)
+                                        : const Color(0xFFFEE2E2),
+                                  ),
                                 ),
                               ),
                               child: Text(
                                 "Sign Out",
-                                style: GoogleFonts.manrope(fontWeight: FontWeight.bold),
+                                style: GoogleFonts.manrope(
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ),
@@ -216,7 +246,10 @@ class SettingsView extends StatelessWidget {
                         const SizedBox(height: 16),
                         Text(
                           "iMate v1.0.0",
-                          style: GoogleFonts.manrope(fontSize: 12, color: textGrey),
+                          style: GoogleFonts.manrope(
+                            fontSize: 12,
+                            color: textGrey,
+                          ),
                         ),
                         const SizedBox(height: 24),
                       ],
@@ -231,7 +264,11 @@ class SettingsView extends StatelessWidget {
     );
   }
 
-  Widget _buildAppBar(BuildContext context, Color textColor, Color borderColor) {
+  Widget _buildAppBar(
+    BuildContext context,
+    Color textColor,
+    Color borderColor,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -315,10 +352,20 @@ class SettingsView extends StatelessWidget {
                               )
                             : null,
                         boxShadow: [
-                          BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4))
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
                         ],
                       ),
-                      child: photoUrl.isEmpty ? const Icon(Icons.person, size: 60, color: Colors.grey) : null,
+                      child: photoUrl.isEmpty
+                          ? const Icon(
+                              Icons.person,
+                              size: 60,
+                              color: Colors.grey,
+                            )
+                          : null,
                     ),
                     Positioned(
                       bottom: 4,
@@ -326,10 +373,20 @@ class SettingsView extends StatelessWidget {
                       child: Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                            color: const Color(0xFF2B7CEE),
-                            shape: BoxShape.circle,
-                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)]),
-                        child: const Icon(Icons.edit, color: Colors.white, size: 14),
+                          color: const Color(0xFF2B7CEE),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 4,
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.edit,
+                          color: Colors.white,
+                          size: 14,
+                        ),
                       ),
                     ),
                   ],
@@ -338,7 +395,11 @@ class SettingsView extends StatelessWidget {
               const SizedBox(height: 16),
               Text(
                 name,
-                style: GoogleFonts.manrope(fontSize: 24, fontWeight: FontWeight.bold, color: textColor),
+                style: GoogleFonts.manrope(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: textColor,
+                ),
               ),
               Text(
                 email,
@@ -367,7 +428,11 @@ class SettingsView extends StatelessWidget {
     );
   }
 
-  Widget _buildSectionContainer(Color cardColor, Color borderColor, {required List<Widget> children}) {
+  Widget _buildSectionContainer(
+    Color cardColor,
+    Color borderColor, {
+    required List<Widget> children,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
@@ -375,7 +440,9 @@ class SettingsView extends StatelessWidget {
           color: cardColor,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: borderColor),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 2)],
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 2),
+          ],
         ),
         child: Column(children: children),
       ),
@@ -396,34 +463,47 @@ class SettingsView extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          border: showBorder ? Border(bottom: BorderSide(color: borderColor)) : null,
+          border: showBorder
+              ? Border(bottom: BorderSide(color: borderColor))
+              : null,
         ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: primaryColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: primaryColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, color: primaryColor, size: 20),
             ),
-            child: Icon(icon, color: primaryColor, size: 20),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: GoogleFonts.manrope(fontSize: 14, fontWeight: FontWeight.bold, color: textColor)),
-                if (subtitle != null)
-                  Text(subtitle, style: GoogleFonts.manrope(fontSize: 12, color: textGrey)),
-              ],
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.manrope(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: textColor,
+                    ),
+                  ),
+                  if (subtitle != null)
+                    Text(
+                      subtitle,
+                      style: GoogleFonts.manrope(fontSize: 12, color: textGrey),
+                    ),
+                ],
+              ),
             ),
-          ),
-          Icon(Icons.chevron_right, color: textGrey, size: 20),
-        ],
+            Icon(Icons.chevron_right, color: textGrey, size: 20),
+          ],
+        ),
       ),
-    ));
+    );
   }
 
   Widget _buildSwitchTile({
@@ -438,7 +518,9 @@ class SettingsView extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        border: showBorder ? Border(bottom: BorderSide(color: borderColor)) : null,
+        border: showBorder
+            ? Border(bottom: BorderSide(color: borderColor))
+            : null,
       ),
       child: Row(
         children: [
@@ -453,7 +535,14 @@ class SettingsView extends StatelessWidget {
           ),
           const SizedBox(width: 16),
           Expanded(
-            child: Text(title, style: GoogleFonts.manrope(fontSize: 14, fontWeight: FontWeight.bold, color: textColor)),
+            child: Text(
+              title,
+              style: GoogleFonts.manrope(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: textColor,
+              ),
+            ),
           ),
           Switch.adaptive(
             value: value,

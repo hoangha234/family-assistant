@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import '../cubit/health_report_cubit.dart';
 
 class HealthReportScreen extends StatelessWidget {
@@ -24,6 +25,12 @@ class HealthReportView extends StatelessWidget {
   final Color textDark = const Color(0xFF111814);
   final Color textMuted = const Color(0xFF6B7280);
 
+  Color _getScoreColor(double score) {
+    if (score >= 80) return const Color(0xFF13EC80); // Good - Green
+    if (score >= 50) return const Color(0xFFFFD54F); // Avg - Light Yellow
+    return const Color(0xFFEF5350); // Bad - Red
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -33,25 +40,35 @@ class HealthReportView extends StatelessWidget {
 
     return BlocBuilder<HealthReportCubit, HealthReportState>(
       builder: (context, state) {
+        if (state.isLoading) {
+          return Scaffold(
+            backgroundColor: backgroundColor,
+            body: const Center(child: CircularProgressIndicator()),
+          );
+        }
         return Scaffold(
           backgroundColor: backgroundColor,
-          body: SingleChildScrollView(
-            child: Column(
+          body: RefreshIndicator(
+            onRefresh: () => context.read<HealthReportCubit>().refresh(),
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildAppBar(context, textColor),
                 const SizedBox(height: 8),
-                _buildWeeklyActivitySection(cardColor, textColor, isDarkMode),
+                _buildWeeklyActivitySection(context, state, cardColor, textColor, isDarkMode),
                 const SizedBox(height: 24),
-                _buildAveragesSection(cardColor, textColor, isDarkMode),
+                _buildAveragesSection(state, cardColor, textColor, isDarkMode),
                 const SizedBox(height: 24),
-                _buildNutritionBreakdownSection(cardColor, textColor, isDarkMode),
+                _buildNutritionBreakdownSection(state, cardColor, textColor, isDarkMode),
                 const SizedBox(height: 24),
-                _buildWeeklyCaloriesCard(),
+                _buildWeeklyCaloriesCard(state),
                 const SizedBox(height: 32),
               ],
             ),
           ),
+        ),
         );
       },
     );
@@ -81,20 +98,33 @@ class HealthReportView extends StatelessWidget {
             ),
           ),
           const Spacer(),
-          const SizedBox(width: 24), // Balance the back button
+          const SizedBox(width: 24), 
         ],
       ),
     );
   }
 
-  Widget _buildWeeklyActivitySection(Color cardColor, Color textColor, bool isDarkMode) {
+  Widget _buildWeeklyActivitySection(BuildContext context, HealthReportState state, Color cardColor, Color textColor, bool isDarkMode) {
+    final scores = state.weeklyScores;
+    final currentColor = _getScoreColor(state.currentScore);
+
+    String dateRange = "This Week";
+    if (state.weeklyData.isNotEmpty) {
+      final firstDay = DateTime.tryParse(state.weeklyData.first.date);
+      final lastDay = DateTime.tryParse(state.weeklyData.last.date);
+      if (firstDay != null && lastDay != null) {
+        final formatter = DateFormat('MMM d');
+        dateRange = "${formatter.format(firstDay)} - ${formatter.format(lastDay)}";
+      }
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            "Weekly Activity",
+            "Weekly Health Summary",
             style: GoogleFonts.manrope(
               fontSize: 24,
               fontWeight: FontWeight.bold,
@@ -103,7 +133,7 @@ class HealthReportView extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            "Oct 16 - Oct 22",
+            dateRange,
             style: GoogleFonts.manrope(
               fontSize: 14,
               color: textMuted,
@@ -134,7 +164,7 @@ class HealthReportView extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          "Activity Score",
+                          "Weekly Health Score",
                           style: GoogleFonts.manrope(
                             fontSize: 14,
                             color: textMuted,
@@ -142,11 +172,11 @@ class HealthReportView extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          "85",
+                          state.currentScore.round().toString(),
                           style: GoogleFonts.manrope(
                             fontSize: 40,
                             fontWeight: FontWeight.bold,
-                            color: textColor,
+                            color: currentColor,
                           ),
                         ),
                       ],
@@ -154,19 +184,21 @@ class HealthReportView extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: primaryColor.withAlpha(26),
+                        color: state.isScoreChangePositive ? const Color(0xFF13EC80).withAlpha(26) : Colors.red.withAlpha(26),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.trending_up, color: primaryColor, size: 14),
+                          Icon(state.isScoreChangePositive ? Icons.trending_up : Icons.trending_down, 
+                               color: state.isScoreChangePositive ? const Color(0xFF13EC80) : Colors.red, 
+                               size: 14),
                           const SizedBox(width: 4),
                           Text(
-                            "+12%",
+                            state.scoreChangeText,
                             style: GoogleFonts.manrope(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
-                              color: primaryColor,
+                              color: state.isScoreChangePositive ? const Color(0xFF13EC80) : Colors.red,
                             ),
                           ),
                         ],
@@ -181,15 +213,17 @@ class HealthReportView extends StatelessWidget {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      _buildActivityBar(0.5, false, isDarkMode, "Mon"),
-                      _buildActivityBar(0.55, false, isDarkMode, "Tue"),
-                      _buildActivityBar(0.95, true, isDarkMode, "Wed"),
-                      _buildActivityBar(0.6, false, isDarkMode, "Thu"),
-                      _buildActivityBar(0.7, false, isDarkMode, "Fri"),
-                      _buildActivityBar(0.65, false, isDarkMode, "Sat"),
-                      _buildActivityBar(0.55, false, isDarkMode, "Sun"),
-                    ],
+                    children: List.generate(7, (index) {
+                      if (index >= scores.length) return const SizedBox();
+                      final score = scores[index];
+                      final isSelected = state.selectedDayIndex == index;
+                      final dayDate = DateTime.tryParse(state.weeklyData[index].date);
+                      final dayLbl = dayDate != null ? DateFormat('EEE').format(dayDate) : "";
+                      return GestureDetector(
+                        onTap: () => context.read<HealthReportCubit>().selectDay(index),
+                        child: _buildActivityBar(score / 100, isSelected, _getScoreColor(score), dayLbl),
+                      );
+                    }),
                   ),
                 ),
               ],
@@ -200,25 +234,17 @@ class HealthReportView extends StatelessWidget {
     );
   }
 
-  Widget _buildActivityBar(double heightFactor, bool isHighlighted, bool isDarkMode, String label) {
+  Widget _buildActivityBar(double heightFactor, bool isHighlighted, Color barColor, String label) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
         Container(
           width: 36,
-          height: 70 * heightFactor,
+          height: 70 * heightFactor.clamp(0.05, 1.0),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.bottomCenter,
-              end: Alignment.topCenter,
-              colors: isHighlighted
-                  ? [primaryColor, primaryColor.withAlpha(200)]
-                  : [
-                      primaryColor.withAlpha(77),
-                      primaryColor.withAlpha(128),
-                    ],
-            ),
+            color: barColor.withAlpha(isHighlighted ? 255 : 120),
             borderRadius: BorderRadius.circular(8),
+            border: isHighlighted ? Border.all(color: Colors.white, width: 1.5) : null,
           ),
         ),
         const SizedBox(height: 8),
@@ -234,7 +260,11 @@ class HealthReportView extends StatelessWidget {
     );
   }
 
-  Widget _buildAveragesSection(Color cardColor, Color textColor, bool isDarkMode) {
+  Widget _buildAveragesSection(HealthReportState state, Color cardColor, Color textColor, bool isDarkMode) {
+    final stepsFmt = state.averageSteps >= 1000 
+        ? "${(state.averageSteps / 1000).toStringAsFixed(1)}k" 
+        : state.averageSteps.round().toString();
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -251,13 +281,13 @@ class HealthReportView extends StatelessWidget {
           const SizedBox(height: 16),
           Row(
             children: [
-              Expanded(
+               Expanded(
                 child: _buildAverageCard(
                   cardColor: cardColor,
                   textColor: textColor,
-                  isDarkMode: isDarkMode,
+                  color: const Color(0xFF13EC80),
                   icon: Icons.bedtime_outlined,
-                  value: "7.5h",
+                  value: "${state.averageSleepHours.toStringAsFixed(1)}h",
                   label: "Sleep",
                 ),
               ),
@@ -266,9 +296,9 @@ class HealthReportView extends StatelessWidget {
                 child: _buildAverageCard(
                   cardColor: cardColor,
                   textColor: textColor,
-                  isDarkMode: isDarkMode,
+                  color: Colors.blue,
                   icon: Icons.directions_run,
-                  value: "10.5k",
+                  value: stepsFmt,
                   label: "Steps",
                 ),
               ),
@@ -277,9 +307,9 @@ class HealthReportView extends StatelessWidget {
                 child: _buildAverageCard(
                   cardColor: cardColor,
                   textColor: textColor,
-                  isDarkMode: isDarkMode,
+                  color: Colors.cyan,
                   icon: Icons.water_drop_outlined,
-                  value: "2.5L",
+                  value: "${state.averageWaterLiters.toStringAsFixed(1)}L",
                   label: "Water",
                 ),
               ),
@@ -293,7 +323,7 @@ class HealthReportView extends StatelessWidget {
   Widget _buildAverageCard({
     required Color cardColor,
     required Color textColor,
-    required bool isDarkMode,
+    required Color color,
     required IconData icon,
     required String value,
     required String label,
@@ -317,10 +347,10 @@ class HealthReportView extends StatelessWidget {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: primaryColor.withAlpha(26),
+              color: color.withAlpha(26),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: primaryColor, size: 20),
+            child: Icon(icon, color: color, size: 20),
           ),
           const SizedBox(height: 12),
           Text(
@@ -344,7 +374,7 @@ class HealthReportView extends StatelessWidget {
     );
   }
 
-  Widget _buildNutritionBreakdownSection(Color cardColor, Color textColor, bool isDarkMode) {
+  Widget _buildNutritionBreakdownSection(HealthReportState state, Color cardColor, Color textColor, bool isDarkMode) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -380,9 +410,9 @@ class HealthReportView extends StatelessWidget {
                   height: 100,
                   child: CustomPaint(
                     painter: DonutChartPainter(
-                      carbsPercent: 0.45,
-                      proteinPercent: 0.30,
-                      fatsPercent: 0.25,
+                      carbsPercent: state.carbsPercent,
+                      proteinPercent: state.proteinPercent,
+                      fatsPercent: state.fatsPercent,
                     ),
                     child: Center(
                       child: Column(
@@ -414,11 +444,11 @@ class HealthReportView extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildLegendItem(primaryColor, "Carbs", "45%", textColor),
+                      _buildLegendItem(const Color(0xFF13EC80), "Carbs", "${(state.carbsPercent * 100).toStringAsFixed(0)}%", textColor),
                       const SizedBox(height: 12),
-                      _buildLegendItem(Colors.blue, "Protein", "30%", textColor),
+                      _buildLegendItem(Colors.blue, "Protein", "${(state.proteinPercent * 100).toStringAsFixed(0)}%", textColor),
                       const SizedBox(height: 12),
-                      _buildLegendItem(Colors.red, "Fats", "25%", textColor),
+                      _buildLegendItem(Colors.red, "Fats", "${(state.fatsPercent * 100).toStringAsFixed(0)}%", textColor),
                     ],
                   ),
                 ),
@@ -463,7 +493,8 @@ class HealthReportView extends StatelessWidget {
     );
   }
 
-  Widget _buildWeeklyCaloriesCard() {
+  Widget _buildWeeklyCaloriesCard(HealthReportState state) {
+    final formatter = NumberFormat('#,###');
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
@@ -473,14 +504,14 @@ class HealthReportView extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              primaryColor,
-              primaryColor.withAlpha(200),
+              const Color(0xFF13EC80),
+              const Color(0xFF13EC80).withAlpha(200),
             ],
           ),
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: primaryColor.withAlpha(77),
+              color: const Color(0xFF13EC80).withAlpha(77),
               blurRadius: 16,
               offset: const Offset(0, 8),
             ),
@@ -506,7 +537,7 @@ class HealthReportView extends StatelessWidget {
                   textBaseline: TextBaseline.alphabetic,
                   children: [
                     Text(
-                      "14,250",
+                      formatter.format(state.totalCaloriesBurned),
                       style: GoogleFonts.manrope(
                         fontSize: 32,
                         fontWeight: FontWeight.bold,
@@ -559,6 +590,8 @@ class DonutChartPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (carbsPercent == 0 && proteinPercent == 0 && fatsPercent == 0) return;
+    
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
     const strokeWidth = 12.0;
@@ -573,35 +606,41 @@ class DonutChartPainter extends CustomPainter {
 
     // Carbs (green)
     paint.color = const Color(0xFF13EC80);
-    canvas.drawArc(
-      rect,
-      startAngle,
-      carbsPercent * 2 * 3.14159,
-      false,
-      paint,
-    );
+    if(carbsPercent > 0) {
+      canvas.drawArc(
+        rect,
+        startAngle,
+        carbsPercent * 2 * 3.14159,
+        false,
+        paint,
+      );
+    }
 
     // Protein (blue)
     paint.color = Colors.blue;
-    canvas.drawArc(
-      rect,
-      startAngle + carbsPercent * 2 * 3.14159,
-      proteinPercent * 2 * 3.14159,
-      false,
-      paint,
-    );
+    if(proteinPercent > 0) {
+      canvas.drawArc(
+        rect,
+        startAngle + carbsPercent * 2 * 3.14159,
+        proteinPercent * 2 * 3.14159,
+        false,
+        paint,
+      );
+    }
 
     // Fats (red)
     paint.color = Colors.red;
-    canvas.drawArc(
-      rect,
-      startAngle + (carbsPercent + proteinPercent) * 2 * 3.14159,
-      fatsPercent * 2 * 3.14159,
-      false,
-      paint,
-    );
+    if(fatsPercent > 0) {
+      canvas.drawArc(
+        rect,
+        startAngle + (carbsPercent + proteinPercent) * 2 * 3.14159,
+        fatsPercent * 2 * 3.14159,
+        false,
+        paint,
+      );
+    }
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

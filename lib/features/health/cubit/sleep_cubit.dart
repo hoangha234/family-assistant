@@ -118,6 +118,11 @@ class SleepCubit extends Cubit<SleepState> {
     }
   }
 
+  Future<void> refresh() async {
+    _subscribeToSleepData();
+    await _loadHistory();
+  }
+
   @override
   Future<void> close() {
     _sleepDataSubscription?.cancel();

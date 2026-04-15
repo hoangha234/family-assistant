@@ -155,8 +155,11 @@ class _SleepDetailsViewState extends State<_SleepDetailsView> {
               ? const Center(
                   child: CircularProgressIndicator(color: primaryGreen),
                 )
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(
+              : RefreshIndicator(
+                  onRefresh: () => context.read<SleepCubit>().refresh(),
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(
                     horizontal: 24,
                     vertical: 16,
                   ),
@@ -179,6 +182,7 @@ class _SleepDetailsViewState extends State<_SleepDetailsView> {
                       const SizedBox(height: 40),
                     ],
                   ),
+                ),
                 ),
         );
       },

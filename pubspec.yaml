@@ -33,12 +33,25 @@ dependencies:
   flutter_local_notifications: ^21.0.0
   timezone: ^0.11.0
   flutter_timezone: ^5.0.2
+  shared_preferences: ^2.5.5
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
   flutter_launcher_icons: ^0.14.3
+  flutter_native_splash: ^2.4.1
+
+flutter_native_splash:
+  color: "#EAF9F4"
+  color_dark: "#102219"
+  image: "assets/transparent.png"
+  image_dark: "assets/transparent.png"
+  android_12:
+    color: "#EAF9F4"
+    color_dark: "#102219"
+    image: "assets/transparent.png"
+    image_dark: "assets/transparent.png"
 
 flutter_launcher_icons:
   android: true
@@ -51,3 +64,5 @@ flutter_launcher_icons:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/robot.png

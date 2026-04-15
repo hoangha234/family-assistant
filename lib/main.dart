@@ -12,7 +12,7 @@ import 'package:family_assistant/features/home/screens/home_screen.dart';
 import 'package:family_assistant/features/iot/cubit/iot_cubit.dart';
 import 'package:family_assistant/features/meal_planning/cubit/meal_plan_cubit.dart';
 import 'package:family_assistant/features/shopping_schedule/cubit/shopping_schedule_cubit.dart';
-
+import 'package:family_assistant/features/splash/screens/splash_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
@@ -56,7 +56,7 @@ class MyApp extends StatelessWidget {
               colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0D6CF2), brightness: Brightness.dark),
               useMaterial3: true,
             ),
-            home: const AuthWrapper(),
+            home: const IMateSplashScreen(),
           );
         },
       ),

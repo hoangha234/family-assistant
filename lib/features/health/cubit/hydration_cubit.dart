@@ -14,12 +14,13 @@ class HydrationCubit extends Cubit<HydrationState> {
     _init();
   }
 
-  void _init() async {
+  Future<void> _init() async {
     emit(state.copyWith(status: HydrationStatus.loading));
     try {
       // Ensure today's plan exists or create it
       await _hydrationService.getOrCreateTodayPlan();
 
+      _planSubscription?.cancel();
       _planSubscription = _hydrationService.streamTodayPlan().listen(
         (plan) {
           emit(state.copyWith(
@@ -101,6 +102,10 @@ class HydrationCubit extends Cubit<HydrationState> {
         errorMessage: e.toString(),
       ));
     }
+  }
+
+  Future<void> refresh() async {
+    await _init();
   }
 
   @override

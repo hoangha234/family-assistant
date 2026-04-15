@@ -121,8 +121,11 @@ class _HydrationScreenState extends State<HydrationScreen> {
                   nextSession = plan.sessions[drankCups];
                 }
 
-                return SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(
+                return RefreshIndicator(
+                  onRefresh: () => context.read<HydrationCubit>().refresh(),
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(
                     horizontal: 24,
                     vertical: 16,
                   ),
@@ -142,6 +145,7 @@ class _HydrationScreenState extends State<HydrationScreen> {
                       const SizedBox(height: 40),
                     ],
                   ),
+                ),
                 );
               },
             ),

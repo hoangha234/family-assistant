@@ -3,6 +3,7 @@ import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter/foundation.dart';
 import 'dart:io';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _notificationsPlugin =
@@ -34,6 +35,13 @@ class NotificationService {
 
   static Future<void> scheduleHydrationReminders(List<DateTime> sessions) async {
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final pushEnabled = prefs.getBool('pushNotifications') ?? true;
+      if (!pushEnabled) {
+        debugPrint('[NotificationService] Push notifications disabled, skipping scheduling.');
+        return;
+      }
+
       // Cancel previous scheduled reminders for hydration (using a specific ID range, e.g., 100 to 104)
       for (int i = 0; i < 5; i++) {
         await _notificationsPlugin.cancel(id: 100 + i);
@@ -69,6 +77,17 @@ class NotificationService {
       await debugPrintScheduledNotifications();
     } catch (e) {
       debugPrint('[NotificationService] Error scheduling reminders: $e');
+    }
+  }
+
+  static Future<void> cancelAllHydrationReminders() async {
+    try {
+      for (int i = 0; i < 5; i++) {
+        await _notificationsPlugin.cancel(id: 100 + i);
+      }
+      debugPrint('[NotificationService] Cancelled all hydration reminders.');
+    } catch (e) {
+      debugPrint('[NotificationService] Error canceling reminders: $e');
     }
   }
 
