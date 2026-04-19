@@ -111,7 +111,8 @@ class _AiAssistantViewState extends State<AiAssistantView> {
                   child: ListView.builder(
                     controller: _scrollController,
                     padding: const EdgeInsets.all(16),
-                    itemCount: state.messages.length + (state.isLoading ? 1 : 0),
+                    itemCount:
+                        state.messages.length + (state.isLoading ? 1 : 0),
                     itemBuilder: (context, index) {
                       if (index == state.messages.length && state.isLoading) {
                         return Padding(
@@ -125,7 +126,11 @@ class _AiAssistantViewState extends State<AiAssistantView> {
                         padding: EdgeInsets.only(top: showSpacing ? 24 : 0),
                         child: message.role == MessageRole.user
                             ? _buildUserMessage(message.content, photoUrl)
-                            : _buildAiMessage(message.content, cardColor, textColor),
+                            : _buildAiMessage(
+                                message.content,
+                                cardColor,
+                                textColor,
+                              ),
                       );
                     },
                   ),
@@ -140,7 +145,14 @@ class _AiAssistantViewState extends State<AiAssistantView> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       _buildSuggestions(isDarkMode, state.isLoading),
-                      _buildComposer(cardColor, textColor, borderColor, isDarkMode, state.isLoading, photoUrl),
+                      _buildComposer(
+                        cardColor,
+                        textColor,
+                        borderColor,
+                        isDarkMode,
+                        state.isLoading,
+                        photoUrl,
+                      ),
                     ],
                   ),
                 ),
@@ -152,7 +164,11 @@ class _AiAssistantViewState extends State<AiAssistantView> {
     );
   }
 
-  Widget _buildAppBar(BuildContext context, Color textColor, Color borderColor) {
+  Widget _buildAppBar(
+    BuildContext context,
+    Color textColor,
+    Color borderColor,
+  ) {
     final scaffoldBgColor = Theme.of(context).scaffoldBackgroundColor;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -182,7 +198,8 @@ class _AiAssistantViewState extends State<AiAssistantView> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
-                      width: 8, height: 8,
+                      width: 8,
+                      height: 8,
                       decoration: const BoxDecoration(
                         color: Colors.green,
                         shape: BoxShape.circle,
@@ -206,7 +223,8 @@ class _AiAssistantViewState extends State<AiAssistantView> {
           GestureDetector(
             onTap: () => context.read<AiAssistantCubit>().clearChat(),
             child: Container(
-              width: 40, height: 40,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
                 color: primaryColor.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
@@ -224,7 +242,8 @@ class _AiAssistantViewState extends State<AiAssistantView> {
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         Container(
-          width: 32, height: 32,
+          width: 32,
+          height: 32,
           decoration: BoxDecoration(
             color: primaryColor.withValues(alpha: 0.1),
             shape: BoxShape.circle,
@@ -238,10 +257,20 @@ class _AiAssistantViewState extends State<AiAssistantView> {
             children: [
               Padding(
                 padding: const EdgeInsets.only(left: 4, bottom: 4),
-                child: Text("iMate AI", style: GoogleFonts.manrope(fontSize: 12, fontWeight: FontWeight.w500, color: textGrey)),
+                child: Text(
+                  "iMate AI",
+                  style: GoogleFonts.manrope(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: textGrey,
+                  ),
+                ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: cardColor,
                   borderRadius: const BorderRadius.only(
@@ -251,12 +280,20 @@ class _AiAssistantViewState extends State<AiAssistantView> {
                     bottomLeft: Radius.zero,
                   ),
                   boxShadow: [
-                    BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 2))
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
                   ],
                 ),
                 child: Text(
                   text,
-                  style: GoogleFonts.manrope(fontSize: 14, color: textColor, height: 1.5),
+                  style: GoogleFonts.manrope(
+                    fontSize: 14,
+                    color: textColor,
+                    height: 1.5,
+                  ),
                 ),
               ),
             ],
@@ -279,10 +316,20 @@ class _AiAssistantViewState extends State<AiAssistantView> {
             children: [
               Padding(
                 padding: const EdgeInsets.only(right: 4, bottom: 4),
-                child: Text("You", style: GoogleFonts.manrope(fontSize: 12, fontWeight: FontWeight.w500, color: textGrey)),
+                child: Text(
+                  "You",
+                  style: GoogleFonts.manrope(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: textGrey,
+                  ),
+                ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: primaryColor,
                   borderRadius: const BorderRadius.only(
@@ -294,7 +341,11 @@ class _AiAssistantViewState extends State<AiAssistantView> {
                 ),
                 child: Text(
                   text,
-                  style: GoogleFonts.manrope(fontSize: 14, color: Colors.white, height: 1.5),
+                  style: GoogleFonts.manrope(
+                    fontSize: 14,
+                    color: Colors.white,
+                    height: 1.5,
+                  ),
                 ),
               ),
             ],
@@ -316,7 +367,8 @@ class _AiAssistantViewState extends State<AiAssistantView> {
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         Container(
-          width: 32, height: 32,
+          width: 32,
+          height: 32,
           decoration: BoxDecoration(
             color: primaryColor.withValues(alpha: 0.1),
             shape: BoxShape.circle,
@@ -335,7 +387,11 @@ class _AiAssistantViewState extends State<AiAssistantView> {
               bottomLeft: Radius.zero,
             ),
             boxShadow: [
-              BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 2))
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
             ],
           ),
           child: _TypingDots(color: primaryColor),
@@ -347,52 +403,76 @@ class _AiAssistantViewState extends State<AiAssistantView> {
   Widget _buildSuggestions(bool isDarkMode, bool isLoading) {
     final suggestions = [
       {"icon": Icons.restaurant, "text": "Suggest a healthy dinner"},
-      {"icon": Icons.account_balance_wallet, "text": "Check my budget"},
-      {"icon": Icons.lightbulb, "text": "Turn off living room lights"},
+      {
+        "icon": Icons.account_balance_wallet,
+        "text": "Suggested weight loss diet",
+      },
+      {"icon": Icons.lightbulb, "text": "Morning exercise suggestions"},
     ];
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
-        children: suggestions.map((s) => Padding(
-          padding: const EdgeInsets.only(right: 8),
-          child: InkWell(
-            onTap: isLoading ? null : () => _sendSuggestion(s['text'] as String),
-            borderRadius: BorderRadius.circular(20),
-            child: Opacity(
-              opacity: isLoading ? 0.5 : 1.0,
-              child: Container(
-                height: 36,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  color: isDarkMode ? Colors.grey[800] : Colors.white,
+        children: suggestions
+            .map(
+              (s) => Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: InkWell(
+                  onTap: isLoading
+                      ? null
+                      : () => _sendSuggestion(s['text'] as String),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: isDarkMode ? Colors.grey[700]! : Colors.grey[200]!),
-                ),
-                child: Row(
-                  children: [
-                    Icon(s['icon'] as IconData, size: 18, color: primaryColor),
-                    const SizedBox(width: 8),
-                    Text(
-                      s['text'] as String,
-                      style: GoogleFonts.manrope(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: isDarkMode ? Colors.white : textDark,
+                  child: Opacity(
+                    opacity: isLoading ? 0.5 : 1.0,
+                    child: Container(
+                      height: 36,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: isDarkMode ? Colors.grey[800] : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isDarkMode
+                              ? Colors.grey[700]!
+                              : Colors.grey[200]!,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            s['icon'] as IconData,
+                            size: 18,
+                            color: primaryColor,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            s['text'] as String,
+                            style: GoogleFonts.manrope(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: isDarkMode ? Colors.white : textDark,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ),
-        )).toList(),
+            )
+            .toList(),
       ),
     );
   }
 
-  Widget _buildComposer(Color cardColor, Color textColor, Color borderColor, bool isDarkMode, bool isLoading, String? photoUrl) {
+  Widget _buildComposer(
+    Color cardColor,
+    Color textColor,
+    Color borderColor,
+    bool isDarkMode,
+    bool isLoading,
+    String? photoUrl,
+  ) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
@@ -423,7 +503,9 @@ class _AiAssistantViewState extends State<AiAssistantView> {
                         textInputAction: TextInputAction.send,
                         onSubmitted: (_) => _sendMessage(),
                         decoration: InputDecoration(
-                          hintText: isLoading ? "Waiting for response..." : "Ask me anything...",
+                          hintText: isLoading
+                              ? "Waiting for response..."
+                              : "Ask me anything...",
                           hintStyle: GoogleFonts.manrope(color: textGrey),
                           border: InputBorder.none,
                           isDense: true,
@@ -441,7 +523,8 @@ class _AiAssistantViewState extends State<AiAssistantView> {
                     child: GestureDetector(
                       onTap: isLoading ? null : _sendMessage,
                       child: Container(
-                        width: 32, height: 32,
+                        width: 32,
+                        height: 32,
                         decoration: BoxDecoration(
                           color: isLoading ? Colors.grey : primaryColor,
                           borderRadius: BorderRadius.circular(12),
@@ -474,7 +557,8 @@ class _TypingDots extends StatefulWidget {
   State<_TypingDots> createState() => _TypingDotsState();
 }
 
-class _TypingDotsState extends State<_TypingDots> with TickerProviderStateMixin {
+class _TypingDotsState extends State<_TypingDots>
+    with TickerProviderStateMixin {
   late List<AnimationController> _controllers;
   late List<Animation<double>> _animations;
 
@@ -490,9 +574,10 @@ class _TypingDotsState extends State<_TypingDots> with TickerProviderStateMixin 
     );
 
     _animations = _controllers.map((controller) {
-      return Tween<double>(begin: 0, end: -8).animate(
-        CurvedAnimation(parent: controller, curve: Curves.easeInOut),
-      );
+      return Tween<double>(
+        begin: 0,
+        end: -8,
+      ).animate(CurvedAnimation(parent: controller, curve: Curves.easeInOut));
     }).toList();
 
     _startAnimation();
@@ -547,4 +632,3 @@ class _TypingDotsState extends State<_TypingDots> with TickerProviderStateMixin 
     );
   }
 }
-

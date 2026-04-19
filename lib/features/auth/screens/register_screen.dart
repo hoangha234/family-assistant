@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../cubit/auth_cubit.dart';
 import '../../home/screens/home_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../widgets/terms_of_use_bottom_sheet.dart';
 import 'login_screen.dart';
 
 class RegisterScreen extends StatelessWidget {
@@ -55,12 +57,35 @@ class _RegisterViewState extends State<RegisterView> {
     final size = MediaQuery.of(context).size;
 
     return BlocListener<AuthCubit, AuthState>(
-      listener: (context, state) {
+      listener: (context, state) async {
         if (state.isAuthenticated) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
-          );
+          final prefs = await SharedPreferences.getInstance();
+          final hasAcceptedTerms = prefs.getBool('has_accepted_terms_global') ?? false;
+          
+          if (!context.mounted) return;
+          
+          if (!hasAcceptedTerms) {
+            final accepted = await TermsOfUseBottomSheet.show(context);
+            if (!context.mounted) return;
+            
+            if (accepted == true) {
+              await prefs.setBool('has_accepted_terms_global', true);
+              if (context.mounted) {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const HomeScreen()),
+                );
+              }
+            } else {
+              // They declined or swiped down to dismiss
+              context.read<AuthCubit>().signOut();
+            }
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const HomeScreen()),
+            );
+          }
         }
         if (state.hasError && state.errorMessage != null) {
           ScaffoldMessenger.of(context).showSnackBar(

@@ -108,9 +108,9 @@ app.*.map.json
 **/linux/flutter/ephemeral/
 
 # Firebase - IMPORTANT: Don't commit sensitive files
-# google-services.json
-# GoogleService-Info.plist
-# firebase_options.dart
+**/google-services.json
+**/GoogleService-Info.plist
+**/firebase_options.dart
 
 # Environment variables
 .env

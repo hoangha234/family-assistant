@@ -1,66 +1,87 @@
-flowchart LR
+%%{init: {"flowchart": {"nodeSpacing": 30, "rankSpacing": 40}}}%%
+flowchart TB
     %% Actors
     User["Family Member"]
-    AuthProvider["Firebase Auth /<br/>Google Sign-In"]
-    FirebaseData["Firestore /<br/>Firebase Storage"]
-    AIPlatform["Gemini / Vertex AI"]
-    DeviceSensors["Phone Sensors /<br/>Camera / Gallery"]
-    IoTPlatform["MQTT Broker /<br/>IoT Devices"]
 
     subgraph FamilyAssistant["Family Assistant"]
+        direction TB
+
+        subgraph TopRow[" "]
+            direction LR
+
+            subgraph AuthSettings["Authentication & Settings"]
+                direction TB
+                UC_Register([Register account])
+                UC_Login([Login with email])
+                UC_GoogleLogin([Login with Google])
+                UC_ResetPassword([Reset password])
+                UC_EditProfile([Edit profile])
+                UC_SyncProfile([Sync profile data])
+                UC_Settings([Change theme /<br/>notification settings])
+                UC_SignOut([Sign out])
+            end
+
+            subgraph ExpenseBudget["Expense & Budget"]
+                direction TB
+                UC_TrackExpense([Track income /<br/>expense])
+                UC_ExpenseOverview([View expense overview])
+                UC_BudgetJars([Manage budget jars])
+                UC_Reports([View financial reports])
+            end
+        end
+
+        subgraph MiddleRow[" "]
+            direction LR
+
+            subgraph ShoppingWallet["Shopping & Wallet"]
+                direction TB
+                UC_CreateSchedule([Create shopping schedule])
+                UC_ViewSchedule([Track pending /<br/>completed schedules])
+                UC_MarkPurchased([Mark schedule as<br/>purchased])
+                UC_ManageWallet([Manage wallets])
+                UC_AutoPay([Auto-deduct wallet for<br/>automatic payment])
+            end
+
+            subgraph MealHealth["Meal Planning & Health"]
+                direction TB
+                UC_GenerateMeal([Generate meal with AI])
+                UC_SaveMeal([Save meal plan by date])
+                UC_ViewMealHistory([View meal history /<br/>meal detail])
+                UC_DeleteMeal([Delete meal and sync<br/>nutrition])
+                UC_TrackSteps([Track steps automatically])
+                UC_UpdateHealth([Update water / sleep /<br/>activity data])
+                UC_ScanFood([Scan food image for<br/>nutrition estimate])
+                UC_ViewHealth([View health dashboard /<br/>weekly report])
+            end
+        end
+
+        subgraph BottomRow[" "]
+            direction LR
+
+            subgraph AIAssistant["AI Assistant"]
+                direction TB
+                UC_ChatAI([Chat with family AI<br/>assistant])
+            end
+
+            subgraph SmartHome["Smart Home IoT"]
+                direction TB
+                UC_ControlIoT([Toggle light / fan])
+                UC_MonitorIoT([Monitor temperature /<br/>humidity])
+            end
+        end
+    end
+
+    subgraph ExternalTop[" "]
         direction LR
+        AuthProvider["Firebase Auth /<br/>Google Sign-In"]
+        FirebaseData["Firestore /<br/>Firebase Storage"]
+        AIPlatform["Gemini / Vertex AI"]
+    end
 
-        subgraph AuthSettings["Authentication & Settings"]
-            direction TB
-            UC_Register([Register account])
-            UC_Login([Login with email])
-            UC_GoogleLogin([Login with Google])
-            UC_ResetPassword([Reset password])
-            UC_EditProfile([Edit profile])
-            UC_SyncProfile([Sync profile data])
-            UC_Settings([Change theme /<br/>notification settings])
-            UC_SignOut([Sign out])
-        end
-
-        subgraph ExpenseBudget["Expense & Budget"]
-            direction TB
-            UC_TrackExpense([Track income /<br/>expense])
-            UC_ExpenseOverview([View expense overview])
-            UC_BudgetJars([Manage budget jars])
-            UC_Reports([View financial reports])
-        end
-
-        subgraph ShoppingWallet["Shopping & Wallet"]
-            direction TB
-            UC_CreateSchedule([Create shopping schedule])
-            UC_ViewSchedule([Track pending /<br/>completed schedules])
-            UC_MarkPurchased([Mark schedule as<br/>purchased])
-            UC_ManageWallet([Manage wallets])
-            UC_AutoPay([Auto-deduct wallet for<br/>automatic payment])
-        end
-
-        subgraph MealHealth["Meal Planning & Health"]
-            direction TB
-            UC_GenerateMeal([Generate meal with AI])
-            UC_SaveMeal([Save meal plan by date])
-            UC_ViewMealHistory([View meal history /<br/>meal detail])
-            UC_DeleteMeal([Delete meal and sync<br/>nutrition])
-            UC_TrackSteps([Track steps automatically])
-            UC_UpdateHealth([Update water / sleep /<br/>activity data])
-            UC_ScanFood([Scan food image for<br/>nutrition estimate])
-            UC_ViewHealth([View health dashboard /<br/>weekly report])
-        end
-
-        subgraph AIAssistant["AI Assistant"]
-            direction TB
-            UC_ChatAI([Chat with family AI<br/>assistant])
-        end
-
-        subgraph SmartHome["Smart Home IoT"]
-            direction TB
-            UC_ControlIoT([Toggle light / fan])
-            UC_MonitorIoT([Monitor temperature /<br/>humidity])
-        end
+    subgraph ExternalBottom[" "]
+        direction LR
+        DeviceSensors["Phone Sensors /<br/>Camera / Gallery"]
+        IoTPlatform["MQTT Broker /<br/>IoT Devices"]
     end
 
     User --> UC_Register
@@ -131,6 +152,12 @@ flowchart LR
 
     UC_ControlIoT --> IoTPlatform
     UC_MonitorIoT --> IoTPlatform
+
+    style TopRow fill:transparent,stroke:transparent
+    style MiddleRow fill:transparent,stroke:transparent
+    style BottomRow fill:transparent,stroke:transparent
+    style ExternalTop fill:transparent,stroke:transparent
+    style ExternalBottom fill:transparent,stroke:transparent
 
     classDef actor fill:#FFFFFF,stroke:#111418,stroke-width:2px,color:#111418;
     classDef usecase fill:#F8FBFF,stroke:#2B7CEE,stroke-width:1.5px,color:#111418;

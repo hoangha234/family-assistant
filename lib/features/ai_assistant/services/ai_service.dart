@@ -39,12 +39,10 @@ class AIService {
 
   int _currentModelIndex = 0;
 
-  AIService({
-    String? apiKey,
-    String? model,
-  })  : _apiKey = apiKey ?? ApiKeys.geminiApiKey,
-        _model = model ?? 'gemini-2.5-flash',
-        _httpClient = HttpClient();
+  AIService({String? apiKey, String? model})
+    : _apiKey = apiKey ?? ApiKeys.geminiApiKey,
+      _model = model ?? 'gemini-2.5-flash',
+      _httpClient = HttpClient();
 
   String get _currentApiVersion => _apiVersions[_currentApiVersionIndex];
 
@@ -122,8 +120,8 @@ You are allowed to be conversational and informal when appropriate.
       contents.add({
         'role': 'user',
         'parts': [
-          {'text': _systemPrompt}
-        ]
+          {'text': _systemPrompt},
+        ],
       });
 
       // Conversation history
@@ -131,8 +129,8 @@ You are allowed to be conversational and informal when appropriate.
         contents.add({
           'role': message.role == MessageRole.user ? 'user' : 'model',
           'parts': [
-            {'text': message.content}
-          ]
+            {'text': message.content},
+          ],
         });
       }
 
@@ -167,7 +165,9 @@ You are allowed to be conversational and informal when appropriate.
 
           if (parts != null && parts.isNotEmpty) {
             final responseText = parts.first['text'] as String;
-            debugPrint('✅ [AI] Got response: ${responseText.substring(0, responseText.length > 50 ? 50 : responseText.length)}...');
+            debugPrint(
+              '✅ [AI] Got response: ${responseText.substring(0, responseText.length > 50 ? 50 : responseText.length)}...',
+            );
             return responseText;
           }
         }
@@ -178,13 +178,17 @@ You are allowed to be conversational and informal when appropriate.
       // 🔁 Retry with another model if not found
       if (response.statusCode == 404) {
         if (_currentModelIndex < _availableModels.length - 1) {
-          debugPrint('⚠️ [AI] Model not found, trying next: ${_availableModels[_currentModelIndex + 1]}');
+          debugPrint(
+            '⚠️ [AI] Model not found, trying next: ${_availableModels[_currentModelIndex + 1]}',
+          );
           _currentModelIndex++;
           _model = _availableModels[_currentModelIndex];
           return sendMessage(messages, retryCount: 0);
         } else if (_currentApiVersionIndex < _apiVersions.length - 1) {
           // Reset model index and try next API version
-          debugPrint('⚠️ [AI] Trying API version: ${_apiVersions[_currentApiVersionIndex + 1]}');
+          debugPrint(
+            '⚠️ [AI] Trying API version: ${_apiVersions[_currentApiVersionIndex + 1]}',
+          );
           _currentModelIndex = 0;
           _model = _availableModels[0];
           _currentApiVersionIndex++;
@@ -200,7 +204,9 @@ You are allowed to be conversational and informal when appropriate.
       // 🔄 Retry on rate limit
       if ((response.statusCode == 429 || response.statusCode == 503) &&
           retryCount < 2) {
-        debugPrint('⚠️ [AI] Rate limited, retrying in ${(retryCount + 1) * 3}s...');
+        debugPrint(
+          '⚠️ [AI] Rate limited, retrying in ${(retryCount + 1) * 3}s...',
+        );
         await Future.delayed(Duration(seconds: (retryCount + 1) * 3));
         return sendMessage(messages, retryCount: retryCount + 1);
       }
@@ -210,7 +216,9 @@ You are allowed to be conversational and informal when appropriate.
           response.statusCode == 403 ||
           response.statusCode == 429 ||
           response.statusCode == 503) {
-        debugPrint('❌ [AI] Error ${response.statusCode}, switching to fallback');
+        debugPrint(
+          '❌ [AI] Error ${response.statusCode}, switching to fallback',
+        );
         _useFallback = true;
         return _getMockResponse(messages.last.content);
       }
@@ -231,21 +239,7 @@ You are allowed to be conversational and informal when appropriate.
 
   /// Mock response cho demo / offline
   String _getMockResponse(String userMessage) {
-    final isVietnamese = _isVietnamese(userMessage);
-
-    if (isVietnamese) {
-      return 'Mạng hơi có vấn đề 😅 nhưng tớ vẫn ở đây nè. Cậu nói tiếp đi~';
-    } else {
-      return 'Looks like the network is unstable 😅 but I\'m still here. Go on~';
-    }
-  }
-
-  bool _isVietnamese(String text) {
-    final vietnamesePattern = RegExp(
-      r'[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]',
-      caseSensitive: false,
-    );
-    return vietnamesePattern.hasMatch(text);
+    return 'Looks like the network is unstable  but I\'m still here. Go on~';
   }
 
   // ============================================================
@@ -262,7 +256,9 @@ You are allowed to be conversational and informal when appropriate.
     }
 
     debugPrint('🎨 [AI] ========== IMAGE GENERATION START ==========');
-    debugPrint('🎨 [AI] Prompt: ${prompt.substring(0, prompt.length > 80 ? 80 : prompt.length)}...');
+    debugPrint(
+      '🎨 [AI] Prompt: ${prompt.substring(0, prompt.length > 80 ? 80 : prompt.length)}...',
+    );
 
     // Configuration attempts - try different models and settings
     final attempts = [
@@ -279,7 +275,10 @@ You are allowed to be conversational and informal when appropriate.
         modalities: ['IMAGE', 'TEXT'],
       ),
       // Attempt 3: Try imagen-3.0-generate-001
-      () => _tryImagenGeneration(prompt: prompt, model: 'imagen-3.0-generate-001'),
+      () => _tryImagenGeneration(
+        prompt: prompt,
+        model: 'imagen-3.0-generate-001',
+      ),
       // Attempt 4: Try with different model name
       () => _tryGeminiImageGeneration(
         prompt: prompt,
@@ -328,15 +327,14 @@ You are allowed to be conversational and informal when appropriate.
           {
             'parts': [
               {
-                'text': 'Create a professional, appetizing food photograph of: $prompt. '
-                    'Style: high-quality food photography, well-lit, beautiful plating, shallow depth of field.'
-              }
-            ]
-          }
+                'text':
+                    'Create a professional, appetizing food photograph of: $prompt. '
+                    'Style: high-quality food photography, well-lit, beautiful plating, shallow depth of field.',
+              },
+            ],
+          },
         ],
-        'generationConfig': {
-          'responseModalities': modalities,
-        },
+        'generationConfig': {'responseModalities': modalities},
       });
 
       request.write(body);
@@ -381,12 +379,9 @@ You are allowed to be conversational and informal when appropriate.
 
       final body = jsonEncode({
         'instances': [
-          {'prompt': 'Professional food photography: $prompt'}
+          {'prompt': 'Professional food photography: $prompt'},
         ],
-        'parameters': {
-          'sampleCount': 1,
-          'aspectRatio': '4:3',
-        },
+        'parameters': {'sampleCount': 1, 'aspectRatio': '4:3'},
       });
 
       request.write(body);
@@ -449,7 +444,9 @@ You are allowed to be conversational and informal when appropriate.
         }
         if (part.containsKey('inline_data')) {
           final inlineData = part['inline_data'] as Map<String, dynamic>;
-          debugPrint('🔍 [AI] Part $i has inline_data: ${inlineData.keys.toList()}');
+          debugPrint(
+            '🔍 [AI] Part $i has inline_data: ${inlineData.keys.toList()}',
+          );
           if (inlineData.containsKey('mime_type')) {
             debugPrint('🔍 [AI] MIME type: ${inlineData['mime_type']}');
           }
@@ -477,7 +474,9 @@ You are allowed to be conversational and informal when appropriate.
         debugPrint('❌ [AI] Unknown error format');
       }
     } catch (_) {
-      debugPrint('❌ [AI] Raw error: ${responseBody.substring(0, responseBody.length > 200 ? 200 : responseBody.length)}');
+      debugPrint(
+        '❌ [AI] Raw error: ${responseBody.substring(0, responseBody.length > 200 ? 200 : responseBody.length)}',
+      );
     }
   }
 
@@ -584,16 +583,18 @@ You are allowed to be conversational and informal when appropriate.
 
     // Vision-capable models to try - using models available from API
     final visionModels = [
-      'gemini-2.5-flash',         // Latest multimodal model
-      'gemini-2.0-flash',         // Current stable multimodal
-      'gemini-2.0-flash-001',     // Specific version
-      'gemini-2.5-pro',           // Pro version with vision
+      'gemini-2.5-flash', // Latest multimodal model
+      'gemini-2.0-flash', // Current stable multimodal
+      'gemini-2.0-flash-001', // Specific version
+      'gemini-2.5-pro', // Pro version with vision
     ];
 
     // Only use v1beta API version (v1 doesn't work for these models)
     final apiVersions = ['v1beta'];
 
-    final prompt = messages.isNotEmpty ? messages.last.content : 'Analyze this image';
+    final prompt = messages.isNotEmpty
+        ? messages.last.content
+        : 'Analyze this image';
 
     for (final apiVersion in apiVersions) {
       for (final visionModel in visionModels) {
@@ -611,17 +612,15 @@ You are allowed to be conversational and informal when appropriate.
             'contents': [
               {
                 'parts': [
-                  {
-                    'text': prompt,
-                  },
+                  {'text': prompt},
                   {
                     'inline_data': {
                       'mime_type': 'image/jpeg',
                       'data': base64Image,
-                    }
-                  }
-                ]
-              }
+                    },
+                  },
+                ],
+              },
             ],
             'generationConfig': {
               'temperature': 0.4,
@@ -636,7 +635,9 @@ You are allowed to be conversational and informal when appropriate.
           final response = await request.close();
           final responseBody = await response.transform(utf8.decoder).join();
 
-          debugPrint('📥 [AI] $visionModel/$apiVersion status: ${response.statusCode}');
+          debugPrint(
+            '📥 [AI] $visionModel/$apiVersion status: ${response.statusCode}',
+          );
 
           if (response.statusCode == 200) {
             final data = jsonDecode(responseBody) as Map<String, dynamic>;
@@ -648,7 +649,9 @@ You are allowed to be conversational and informal when appropriate.
 
               if (parts != null && parts.isNotEmpty) {
                 final responseText = parts.first['text'] as String;
-                debugPrint('✅ [AI] Image analysis complete with $visionModel/$apiVersion');
+                debugPrint(
+                  '✅ [AI] Image analysis complete with $visionModel/$apiVersion',
+                );
                 return responseText;
               }
             }
@@ -656,14 +659,17 @@ You are allowed to be conversational and informal when appropriate.
 
           // Log error details for debugging
           if (response.statusCode != 200) {
-            debugPrint('⚠️ [AI] $visionModel/$apiVersion failed: ${response.statusCode}');
+            debugPrint(
+              '⚠️ [AI] $visionModel/$apiVersion failed: ${response.statusCode}',
+            );
             // Try to get error message
             try {
               final errorData = jsonDecode(responseBody);
-              debugPrint('⚠️ [AI] Error: ${errorData['error']?['message'] ?? responseBody}');
+              debugPrint(
+                '⚠️ [AI] Error: ${errorData['error']?['message'] ?? responseBody}',
+              );
             } catch (_) {}
           }
-
         } catch (e) {
           debugPrint('❌ [AI] Exception with $visionModel/$apiVersion: $e');
         }
@@ -674,7 +680,6 @@ You are allowed to be conversational and informal when appropriate.
     debugPrint('❌ [AI] All vision models failed, using fallback');
     return _getMockFoodAnalysisResponse();
   }
-
 
   /// Mock food analysis response for fallback
   String _getMockFoodAnalysisResponse() {
