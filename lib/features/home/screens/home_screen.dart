@@ -280,35 +280,63 @@ class HomeView extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 16),
-              _buildSummaryCard(
-                color: const Color(0xFF34D399),
-                title: 'Health Score',
-                value: '85',
-                valueSuffix: '/100',
-                icon: Icons.favorite,
-                textColor: const Color(0xFF064E3B),
-                iconBg: Colors.black.withOpacity(0.05),
-                footer: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.trending_up, size: 14, color: Color(0xFF064E3B)),
-                      SizedBox(width: 4),
-                      Text(
-                        'Looking great!',
-                        style: TextStyle(
-                            color: Color(0xFF064E3B),
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold),
+              BlocBuilder<HealthDashboardCubit, HealthDashboardState>(
+                builder: (context, healthState) {
+                  final score = healthState.healthScore.round();
+                  
+                  Color cardColor;
+                  Color contentColor;
+                  IconData trendIcon;
+                  String trendText;
+                  
+                  if (score >= 80) { // Good
+                    cardColor = const Color(0xFF34D399); // Green
+                    contentColor = const Color(0xFF064E3B);
+                    trendIcon = Icons.trending_up;
+                    trendText = 'Looking great!';
+                  } else if (score >= 50) { // Average
+                    cardColor = const Color(0xFFFBBF24); // Amber
+                    contentColor = const Color(0xFF78350F);
+                    trendIcon = Icons.trending_flat;
+                    trendText = 'Keep it up!';
+                  } else { // Bad
+                    cardColor = const Color(0xFFF87171); // Red
+                    contentColor = const Color(0xFF7F1D1D);
+                    trendIcon = Icons.trending_down;
+                    trendText = 'Needs attention!';
+                  }
+
+                  return _buildSummaryCard(
+                    color: cardColor,
+                    title: 'Health Score',
+                    value: '$score',
+                    valueSuffix: '/100',
+                    icon: Icons.favorite,
+                    textColor: contentColor,
+                    iconBg: Colors.black.withOpacity(0.05),
+                    footer: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(6),
                       ),
-                    ],
-                  ),
-                ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(trendIcon, size: 14, color: contentColor),
+                          const SizedBox(width: 4),
+                          Text(
+                            trendText,
+                            style: TextStyle(
+                                color: contentColor,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
           ),

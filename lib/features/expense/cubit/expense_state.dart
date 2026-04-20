@@ -20,7 +20,7 @@ class ExpenseState extends Equatable {
   final String? errorMessage;
 
   const ExpenseState({
-    this.selectedMonthIndex = 2,
+    this.selectedMonthIndex = 0,
     this.status = ExpenseCubitStatus.initial,
     this.allExpenses = const [],
     this.totalBalance = 0.0,

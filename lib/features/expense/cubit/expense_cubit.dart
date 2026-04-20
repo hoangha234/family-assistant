@@ -7,7 +7,7 @@ import '../services/expense_service.dart';
 part 'expense_state.dart';
 
 /// Callback type for notifying when expenses change
-typedef OnExpensesChangedCallback = void Function(double totalBalance);
+typedef OnExpensesChangedCallback = void Function(double totalBalance, Map<String, double> monthlyCategoryTotals);
 
 class ExpenseCubit extends Cubit<ExpenseState> {
   final ExpenseService _expenseService;
@@ -18,7 +18,7 @@ class ExpenseCubit extends Cubit<ExpenseState> {
 
   ExpenseCubit({ExpenseService? expenseService})
       : _expenseService = expenseService ?? ExpenseService(),
-        super(const ExpenseState());
+        super(ExpenseState(selectedMonthIndex: DateTime.now().month - 1));
 
   /// Set callback for expense changes (used by CategoryBudgetCubit)
   void setOnExpensesChangedCallback(OnExpensesChangedCallback callback) {
@@ -47,14 +47,25 @@ class ExpenseCubit extends Cubit<ExpenseState> {
 
   /// Process expenses and calculate totals
   void _processExpenses(List<Expense> expenses) {
-    // Calculate totals dynamically
-    final totalIncome = ExpenseService.calculateTotalIncome(expenses);
-    final totalExpense = ExpenseService.calculateTotalExpense(expenses);
-    final totalBalance = totalIncome - totalExpense;
-    final categoryTotals = ExpenseService.calculateCategoryTotals(expenses);
+    final targetMonth = state.selectedMonthIndex + 1;
+    final targetYear = DateTime.now().year; // Default to current year
 
-    // Recent transactions (last 10)
-    final recentTransactions = expenses.take(10).toList();
+    // Filter expenses for the selected month
+    final monthlyExpenses = expenses.where((e) {
+      return e.createdAt.month == targetMonth && e.createdAt.year == targetYear;
+    }).toList();
+
+    // Calculate totals for the selected month
+    final totalIncome = ExpenseService.calculateTotalIncome(monthlyExpenses);
+    final totalExpense = ExpenseService.calculateTotalExpense(monthlyExpenses);
+    
+    // Overall balance across all time
+    final totalBalance = ExpenseService.calculateTotalIncome(expenses) - ExpenseService.calculateTotalExpense(expenses);
+    
+    final categoryTotals = ExpenseService.calculateCategoryTotals(monthlyExpenses);
+
+    // Recent transactions (last 10 of the month)
+    final recentTransactions = monthlyExpenses.take(10).toList();
 
     emit(state.copyWith(
       status: ExpenseCubitStatus.loaded,
@@ -66,13 +77,15 @@ class ExpenseCubit extends Cubit<ExpenseState> {
       recentTransactions: recentTransactions,
     ));
 
-    // Notify CategoryBudgetCubit about the change
-    onExpensesChanged?.call(totalBalance);
+    // Notify CategoryBudgetCubit with the filtered category totals
+    onExpensesChanged?.call(totalBalance, categoryTotals);
   }
 
   /// Set selected month
   void setMonth(int index) {
     emit(state.copyWith(selectedMonthIndex: index));
+    // Reprocess with the existing data for the new month
+    _processExpenses(state.allExpenses);
   }
 
   /// Refresh data

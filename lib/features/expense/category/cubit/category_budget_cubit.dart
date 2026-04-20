@@ -10,6 +10,7 @@ class CategoryBudgetCubit extends Cubit<CategoryBudgetState> {
   StreamSubscription<List<CategoryBudget>>? _subscription;
 
   double _totalBalance = 0.0;
+  Map<String, double> _currentMonthCategoryTotals = {};
 
   CategoryBudgetCubit({
     CategoryBudgetService? service,
@@ -31,21 +32,32 @@ class CategoryBudgetCubit extends Cubit<CategoryBudgetState> {
         onError: (error) => emit(CategoryBudgetError(error.toString())),
       );
 
-      // Sync with current expenses
-      await recalculateAllCategories();
+      // Do not recalculate globally, wait for ExpenseCubit to provide monthly totals
     } catch (e) {
       emit(CategoryBudgetError('Failed to initialize: $e'));
     }
   }
 
+  List<CategoryBudget> _applyCurrentMonthTotals(List<CategoryBudget> categories) {
+    return categories.map((c) {
+      return c.copyWith(totalSpent: _currentMonthCategoryTotals[c.name] ?? 0.0);
+    }).toList();
+  }
+
   /// Update total balance (called from ExpenseCubit)
-  void updateTotalBalance(double newBalance) {
+  void updateTotalBalance(double newBalance, Map<String, double> categoryTotals) {
     _totalBalance = newBalance;
+    _currentMonthCategoryTotals = categoryTotals;
 
     if (state is CategoryBudgetLoaded) {
       final currentState = state as CategoryBudgetLoaded;
+      final updatedCategories = _applyCurrentMonthTotals(currentState.categories);
+      final totalSpent = updatedCategories.fold(0.0, (sum, c) => sum + c.totalSpent);
+
       emit(currentState.copyWith(
         totalBalance: newBalance,
+        categories: updatedCategories,
+        totalSpentAllCategories: totalSpent,
         clearValidationError: true,
       ));
     }
@@ -53,16 +65,14 @@ class CategoryBudgetCubit extends Cubit<CategoryBudgetState> {
 
   /// Handle category budget stream updates
   void _onCategoriesUpdated(List<CategoryBudget> categories) {
-    print('[CategoryBudgetCubit] Stream received ${categories.length} categories');
-    for (var c in categories) {
-      print('  - ${c.name}: budget=${c.monthlyBudget}, spent=${c.totalSpent}');
-    }
+    // Apply local monthly override instead of global DB totalSpent
+    final updatedCategories = _applyCurrentMonthTotals(categories);
 
-    final totalAllocated = categories.fold(0.0, (sum, c) => sum + c.monthlyBudget);
-    final totalSpent = categories.fold(0.0, (sum, c) => sum + c.totalSpent);
+    final totalAllocated = updatedCategories.fold(0.0, (sum, c) => sum + c.monthlyBudget);
+    final totalSpent = updatedCategories.fold(0.0, (sum, c) => sum + c.totalSpent);
 
     emit(CategoryBudgetLoaded(
-      categories: categories,
+      categories: updatedCategories,
       totalAllocatedBudget: totalAllocated,
       totalBalance: _totalBalance,
       totalSpentAllCategories: totalSpent,

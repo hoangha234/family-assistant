@@ -162,6 +162,19 @@ class HealthDashboardState extends Equatable {
   /// Calculate activity progress (0.0 to 1.0)
   double get activityProgress => (activityMinutes / activityGoal).clamp(0.0, 1.0);
 
+  /// Calculate daily health score (0-100)
+  double get healthScore {
+    double dietScore = (calorieProgress * 15) +
+        (proteinProgress * 10) +
+        (carbsGoal > 0 ? (carbs / carbsGoal).clamp(0.0, 1.0) * 7.5 : 0.0) +
+        (fatGoal > 0 ? (fat / fatGoal).clamp(0.0, 1.0) * 7.5 : 0.0);
+    
+    double activityScore = stepProgress * 30;
+    double restScore = (sleepProgress * 15) + (waterProgress * 15);
+    
+    return (dietScore + activityScore + restScore).clamp(0.0, 100.0);
+  }
+
   // ==================== Formatted values ====================
 
   /// Format sleep hours for display

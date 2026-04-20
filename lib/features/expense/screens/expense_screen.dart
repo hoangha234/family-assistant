@@ -55,9 +55,8 @@ class _ExpenseViewState extends State<ExpenseView> {
       final categoryBudgetCubit = context.read<CategoryBudgetCubit>();
 
       // When expenses change, update category budgets
-      expenseCubit.setOnExpensesChangedCallback((totalBalance) {
-        categoryBudgetCubit.updateTotalBalance(totalBalance);
-        categoryBudgetCubit.recalculateAllCategories();
+      expenseCubit.setOnExpensesChangedCallback((totalBalance, categoryTotals) {
+        categoryBudgetCubit.updateTotalBalance(totalBalance, categoryTotals);
       });
     });
   }
@@ -149,8 +148,14 @@ class _ExpenseViewState extends State<ExpenseView> {
   }
 
   Widget _buildMonthSelector(BuildContext context, ExpenseState state, bool isDarkMode) {
-    final months = ['January', 'February', 'March', 'April', 'May'];
+    final months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
     
+    // Auto-scroll to selected month logic could be added using a ScrollController 
+    // mapped to state.selectedMonthIndex. For now, it will just use a SingleChildScrollView.
+
     return Container(
       color: isDarkMode ? bgDark : Colors.white,
       width: double.infinity,
