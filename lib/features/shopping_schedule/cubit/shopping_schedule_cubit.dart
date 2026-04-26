@@ -150,17 +150,13 @@ class ShoppingScheduleCubit extends Cubit<ShoppingScheduleState> {
       );
       await _expenseService.createExpense(expense);
 
-      // 2. Process payment using transaction (deduct wallet, update status)
+      // 2. Process payment using transaction (deduct wallet, update status or date)
       await _shoppingService.processAutomaticPaymentTransaction(
         scheduleId: scheduleId,
         walletId: walletId,
         amount: schedule.amount,
+        isMonthly: schedule.isMonthly,
       );
-
-      // 3. Create next monthly schedule if needed
-      if (schedule.isMonthly) {
-        await _shoppingService.createNextMonthlySchedule(schedule);
-      }
 
       // Remove from processing and reload
       final updatedProcessingIds = Set<String>.from(state.processingScheduleIds)
@@ -261,19 +257,14 @@ class ShoppingScheduleCubit extends Cubit<ShoppingScheduleState> {
         await _expenseService.createExpense(expense);
         print('   ✅ Expense created');
 
-        // 2. Process payment (deduct wallet, update status)
+        // 2. Process payment (deduct wallet, update status or date)
         await _shoppingService.processAutomaticPaymentTransaction(
           scheduleId: schedule.id,
           walletId: schedule.walletId!,
           amount: schedule.amount,
+          isMonthly: schedule.isMonthly,
         );
-        print('   ✅ Wallet deducted and schedule marked as paid');
-
-        // 3. Create next monthly schedule if needed
-        if (schedule.isMonthly) {
-          await _shoppingService.createNextMonthlySchedule(schedule);
-          print('   ✅ Next monthly schedule created');
-        }
+        print('   ✅ Wallet deducted and schedule updated');
       } else {
         // Insufficient balance - mark as failed
         print('   ❌ Insufficient balance');
@@ -361,10 +352,10 @@ class ShoppingScheduleCubit extends Cubit<ShoppingScheduleState> {
       );
       await _expenseService.createExpense(expense);
 
-      // 2. Use transaction to mark as paid and create next monthly if needed
+      // 2. Use transaction to mark as paid or update due date
       await _shoppingService.markAsPaidWithRecurrence(
         scheduleId: scheduleId,
-        createNextMonthly: schedule.isMonthly,
+        isMonthly: schedule.isMonthly,
       );
 
       await loadSchedules();

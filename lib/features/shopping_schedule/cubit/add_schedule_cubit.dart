@@ -167,19 +167,14 @@ class AddScheduleCubit extends Cubit<AddScheduleState> {
         await _expenseService.createExpense(expense);
         print('   ✅ Expense created');
 
-        // 2. Deduct wallet and update status
+        // 2. Deduct wallet and update status or date
         await _shoppingService.processAutomaticPaymentTransaction(
           scheduleId: schedule.id,
           walletId: schedule.walletId!,
           amount: schedule.amount,
+          isMonthly: schedule.isMonthly,
         );
-        print('   ✅ Wallet deducted and schedule marked as paid');
-
-        // 3. Create next monthly if needed
-        if (schedule.isMonthly) {
-          await _shoppingService.createNextMonthlySchedule(schedule);
-          print('   ✅ Next monthly schedule created');
-        }
+        print('   ✅ Wallet deducted and schedule updated');
       } else {
         print('   ❌ Insufficient balance');
         await _shoppingService.markAsFailed(schedule.id);

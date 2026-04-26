@@ -40,7 +40,7 @@ class MyApp extends StatelessWidget {
         BlocProvider(create: (context) => HealthDashboardCubit()),
         BlocProvider(create: (context) => IotCubit()),
         BlocProvider(create: (context) => MealPlanCubit()..loadMeals()),
-        BlocProvider(create: (context) => ShoppingScheduleCubit()..initialize()),
+        BlocProvider(create: (context) => ShoppingScheduleCubit()),
       ],
       child: BlocBuilder<SettingsCubit, SettingsState>(
         builder: (context, state) {

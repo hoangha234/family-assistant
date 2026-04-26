@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../cubit/shopping_schedule_cubit.dart';
 import '../services/shopping_service.dart';
 import 'add_schedule_screen.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 
 class ShoppingScheduleScreen extends StatelessWidget {
   const ShoppingScheduleScreen({super.key});
@@ -273,8 +274,7 @@ class _ShoppingScheduleViewState extends State<ShoppingScheduleView> {
     final isProcessing = state.isScheduleProcessing(schedule.id);
     final currencyFormat = NumberFormat.currency(symbol: '\$', decimalDigits: 2);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+    Widget card = Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: cardBg,
@@ -382,6 +382,35 @@ class _ShoppingScheduleViewState extends State<ShoppingScheduleView> {
             _buildFailedActions(context, schedule, isProcessing),
           ],
         ],
+      ),
+    );
+
+    if (schedule.status != ScheduleStatus.pending) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: card,
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Slidable(
+        key: ValueKey(schedule.id),
+        endActionPane: ActionPane(
+          motion: const ScrollMotion(),
+          extentRatio: 0.25,
+          children: [
+            SlidableAction(
+              onPressed: (ctx) => _showDeleteConfirmation(context, schedule),
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              icon: Icons.delete,
+              label: 'Delete',
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ],
+        ),
+        child: card,
       ),
     );
   }
@@ -602,6 +631,36 @@ class _ShoppingScheduleViewState extends State<ShoppingScheduleView> {
             },
             style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
             child: const Text('Confirm', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteConfirmation(BuildContext context, ShoppingSchedule schedule) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(
+          'Delete Schedule',
+          style: GoogleFonts.manrope(fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          'Are you sure you want to delete "${schedule.title}"?',
+          style: GoogleFonts.manrope(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              context.read<ShoppingScheduleCubit>().deleteSchedule(schedule.id);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),

@@ -353,39 +353,6 @@ class ShoppingService {
 
   // ==================== MONTHLY RECURRING LOGIC ====================
 
-  /// Create next monthly schedule based on completed schedule
-  /// This should be called after a monthly schedule is marked as paid
-  Future<ShoppingSchedule?> createNextMonthlySchedule(ShoppingSchedule schedule) async {
-    // Only create next schedule if it's a monthly recurring schedule
-    if (schedule.repeatCycle != RepeatCycle.monthly) {
-      return null;
-    }
-
-    try {
-      // Calculate next month's due date
-      final nextDueDate = _calculateNextMonthDate(schedule.dueDate);
-
-      // Create new schedule for next month
-      final nextSchedule = ShoppingSchedule(
-        id: '', // Will be assigned by Firestore
-        title: schedule.title,
-        amount: schedule.amount,
-        category: schedule.category,
-        dueDate: nextDueDate,
-        paymentMode: schedule.paymentMode,
-        status: ScheduleStatus.pending, // Reset to pending
-        walletId: schedule.walletId,
-        repeatCycle: schedule.repeatCycle,
-        notes: schedule.notes,
-        createdAt: DateTime.now(),
-      );
-
-      return await createSchedule(nextSchedule);
-    } catch (e) {
-      throw ShoppingServiceException('Failed to create next monthly schedule: $e');
-    }
-  }
-
   /// Calculate the next month's date, handling month-end cases
   DateTime _calculateNextMonthDate(DateTime currentDate) {
     int nextMonth = currentDate.month + 1;
@@ -415,6 +382,7 @@ class ShoppingService {
     required String scheduleId,
     required String walletId,
     required double amount,
+    required bool isMonthly,
   }) async {
     try {
       await _firestore.runTransaction((transaction) async {
@@ -447,10 +415,18 @@ class ShoppingService {
         // Update wallet balance
         transaction.update(walletRef, {'balance': newBalance});
 
-        // Update schedule status to paid
-        transaction.update(_schedulesRef.doc(scheduleId), {
-          'status': ScheduleStatus.paid.value,
-        });
+        if (isMonthly) {
+          // Keep as pending, update due date to next month
+          final nextDueDate = _calculateNextMonthDate(schedule.dueDate);
+          transaction.update(_schedulesRef.doc(scheduleId), {
+            'dueDate': Timestamp.fromDate(nextDueDate),
+          });
+        } else {
+          // Update schedule status to paid
+          transaction.update(_schedulesRef.doc(scheduleId), {
+            'status': ScheduleStatus.paid.value,
+          });
+        }
       });
     } catch (e) {
       if (e is ShoppingServiceException) rethrow;
@@ -462,7 +438,7 @@ class ShoppingService {
   /// Uses transaction to ensure atomicity
   Future<ShoppingSchedule?> markAsPaidWithRecurrence({
     required String scheduleId,
-    required bool createNextMonthly,
+    required bool isMonthly,
   }) async {
     try {
       ShoppingSchedule? nextSchedule;
@@ -477,44 +453,20 @@ class ShoppingService {
 
         final schedule = ShoppingSchedule.fromFirestore(scheduleDoc);
 
-        // Update status to paid
-        transaction.update(_schedulesRef.doc(scheduleId), {
-          'status': ScheduleStatus.paid.value,
-        });
-
-        // Create next monthly schedule if needed
-        if (createNextMonthly && schedule.isMonthly) {
+        if (isMonthly) {
+          // Keep as pending, update due date to next month
           final nextDueDate = _calculateNextMonthDate(schedule.dueDate);
-
-          final newScheduleData = {
-            'title': schedule.title,
-            'amount': schedule.amount,
-            'category': schedule.category,
+          transaction.update(_schedulesRef.doc(scheduleId), {
             'dueDate': Timestamp.fromDate(nextDueDate),
-            'paymentMode': schedule.paymentMode.value,
-            'status': ScheduleStatus.pending.value,
-            'walletId': schedule.walletId,
-            'repeatCycle': schedule.repeatCycle.value,
-            'notes': schedule.notes,
-            'createdAt': Timestamp.fromDate(DateTime.now()),
-          };
+          });
 
-          final newDocRef = _schedulesRef.doc();
-          transaction.set(newDocRef, newScheduleData);
-
-          nextSchedule = ShoppingSchedule(
-            id: newDocRef.id,
-            title: schedule.title,
-            amount: schedule.amount,
-            category: schedule.category,
-            dueDate: nextDueDate,
-            paymentMode: schedule.paymentMode,
-            status: ScheduleStatus.pending,
-            walletId: schedule.walletId,
-            repeatCycle: schedule.repeatCycle,
-            notes: schedule.notes,
-            createdAt: DateTime.now(),
-          );
+          // Return the updated schedule locally
+          nextSchedule = schedule.copyWith(dueDate: nextDueDate);
+        } else {
+          // Update status to paid
+          transaction.update(_schedulesRef.doc(scheduleId), {
+            'status': ScheduleStatus.paid.value,
+          });
         }
       });
 

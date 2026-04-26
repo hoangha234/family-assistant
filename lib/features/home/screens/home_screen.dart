@@ -21,8 +21,25 @@ import '../../health/cubit/health_dashboard_cubit.dart';
 import '../../wallet/screens/wallet_screen.dart';
 import '../../auth/cubit/auth_cubit.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Initialize ShoppingScheduleCubit after user is authenticated and home screen is shown.
+    // This ensures automatic payments check runs reliably.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<ShoppingScheduleCubit>().initialize();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -109,20 +109,12 @@ You are allowed to be conversational and informal when appropriate.
       final request = await _httpClient.postUrl(uri);
       request.headers.set('Content-Type', 'application/json');
 
-      // 🔥 LIMIT CONTEXT (5–8 messages)
+      //  LIMIT CONTEXT (5–8 messages)
       final recentMessages = messages.length > 8
           ? messages.sublist(messages.length - 8)
           : messages;
 
       final contents = <Map<String, dynamic>>[];
-
-      // 👉 System prompt (ONLY ONE user message, no model confirmation)
-      contents.add({
-        'role': 'user',
-        'parts': [
-          {'text': _systemPrompt},
-        ],
-      });
 
       // Conversation history
       for (final message in recentMessages) {
@@ -135,6 +127,11 @@ You are allowed to be conversational and informal when appropriate.
       }
 
       final body = jsonEncode({
+        'systemInstruction': {
+          'parts': [
+            {'text': _systemPrompt},
+          ]
+        },
         'contents': contents,
         'generationConfig': {
           'temperature': 0.8,
@@ -145,15 +142,15 @@ You are allowed to be conversational and informal when appropriate.
 
       request.write(body);
 
-      // 🔍 DEBUG: Log request
-      debugPrint('🔄 [AI] API: $_currentApiVersion | Model: $_model');
-      debugPrint('🔄 [AI] Messages count: ${recentMessages.length}');
+      //  DEBUG: Log request
+      debugPrint(' [AI] API: $_currentApiVersion | Model: $_model');
+      debugPrint(' [AI] Messages count: ${recentMessages.length}');
 
       final response = await request.close();
       final responseBody = await response.transform(utf8.decoder).join();
 
-      // 🔍 DEBUG: Log response status
-      debugPrint('📥 [AI] Response status: ${response.statusCode}');
+      //  DEBUG: Log response status
+      debugPrint(' [AI] Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(responseBody) as Map<String, dynamic>;
@@ -166,7 +163,7 @@ You are allowed to be conversational and informal when appropriate.
           if (parts != null && parts.isNotEmpty) {
             final responseText = parts.first['text'] as String;
             debugPrint(
-              '✅ [AI] Got response: ${responseText.substring(0, responseText.length > 50 ? 50 : responseText.length)}...',
+              ' [AI] Got response: ${responseText.substring(0, responseText.length > 50 ? 50 : responseText.length)}...',
             );
             return responseText;
           }
@@ -175,11 +172,11 @@ You are allowed to be conversational and informal when appropriate.
         throw AIServiceException('Empty response from Gemini');
       }
 
-      // 🔁 Retry with another model if not found
+      //  Retry with another model if not found
       if (response.statusCode == 404) {
         if (_currentModelIndex < _availableModels.length - 1) {
           debugPrint(
-            '⚠️ [AI] Model not found, trying next: ${_availableModels[_currentModelIndex + 1]}',
+            ' [AI] Model not found, trying next: ${_availableModels[_currentModelIndex + 1]}',
           );
           _currentModelIndex++;
           _model = _availableModels[_currentModelIndex];
@@ -187,7 +184,7 @@ You are allowed to be conversational and informal when appropriate.
         } else if (_currentApiVersionIndex < _apiVersions.length - 1) {
           // Reset model index and try next API version
           debugPrint(
-            '⚠️ [AI] Trying API version: ${_apiVersions[_currentApiVersionIndex + 1]}',
+            ' [AI] Trying API version: ${_apiVersions[_currentApiVersionIndex + 1]}',
           );
           _currentModelIndex = 0;
           _model = _availableModels[0];
@@ -195,8 +192,7 @@ You are allowed to be conversational and informal when appropriate.
           return sendMessage(messages, retryCount: 0);
         } else {
           // All models and API versions failed, use fallback
-          debugPrint('❌ [AI] All models failed, using fallback');
-          _useFallback = true;
+          debugPrint(' [AI] All models failed, using fallback');
           return _getMockResponse(messages.last.content);
         }
       }
@@ -205,7 +201,7 @@ You are allowed to be conversational and informal when appropriate.
       if ((response.statusCode == 429 || response.statusCode == 503) &&
           retryCount < 2) {
         debugPrint(
-          '⚠️ [AI] Rate limited, retrying in ${(retryCount + 1) * 3}s...',
+          ' [AI] Rate limited, retrying in ${(retryCount + 1) * 3}s...',
         );
         await Future.delayed(Duration(seconds: (retryCount + 1) * 3));
         return sendMessage(messages, retryCount: retryCount + 1);
@@ -216,15 +212,12 @@ You are allowed to be conversational and informal when appropriate.
           response.statusCode == 403 ||
           response.statusCode == 429 ||
           response.statusCode == 503) {
-        debugPrint(
-          '❌ [AI] Error ${response.statusCode}, switching to fallback',
-        );
-        _useFallback = true;
+        debugPrint(' [AI] Error ${response.statusCode}, switching to fallback');
         return _getMockResponse(messages.last.content);
       }
 
-      debugPrint('❌ [AI] API Error: ${response.statusCode}');
-      debugPrint('❌ [AI] Response: $responseBody');
+      debugPrint(' [AI] API Error: ${response.statusCode}');
+      debugPrint(' [AI] Response: $responseBody');
       throw AIServiceException(
         'API error: ${response.statusCode}',
         statusCode: response.statusCode,
@@ -255,9 +248,9 @@ You are allowed to be conversational and informal when appropriate.
       throw AIServiceException('Image prompt cannot be empty');
     }
 
-    debugPrint('🎨 [AI] ========== IMAGE GENERATION START ==========');
+    debugPrint(' [AI] ========== IMAGE GENERATION START ==========');
     debugPrint(
-      '🎨 [AI] Prompt: ${prompt.substring(0, prompt.length > 80 ? 80 : prompt.length)}...',
+      ' [AI] Prompt: ${prompt.substring(0, prompt.length > 80 ? 80 : prompt.length)}...',
     );
 
     // Configuration attempts - try different models and settings
@@ -288,21 +281,21 @@ You are allowed to be conversational and informal when appropriate.
     ];
 
     for (int i = 0; i < attempts.length; i++) {
-      debugPrint('🎨 [AI] --- Attempt ${i + 1}/${attempts.length} ---');
+      debugPrint(' [AI] --- Attempt ${i + 1}/${attempts.length} ---');
       try {
         final result = await attempts[i]();
         if (result != null && result.isNotEmpty) {
-          debugPrint('✅ [AI] Image generated! Size: ${result.length} bytes');
-          debugPrint('🎨 [AI] ========== IMAGE GENERATION SUCCESS ==========');
+          debugPrint(' [AI] Image generated! Size: ${result.length} bytes');
+          debugPrint(' [AI] ========== IMAGE GENERATION SUCCESS ==========');
           return result;
         }
       } catch (e) {
-        debugPrint('⚠️ [AI] Attempt ${i + 1} exception: $e');
+        debugPrint(' [AI] Attempt ${i + 1} exception: $e');
       }
     }
 
-    debugPrint('❌ [AI] All attempts failed');
-    debugPrint('🎨 [AI] ========== IMAGE GENERATION FAILED ==========');
+    debugPrint(' [AI] All attempts failed');
+    debugPrint(' [AI] ========== IMAGE GENERATION FAILED ==========');
     return null;
   }
 
@@ -312,7 +305,7 @@ You are allowed to be conversational and informal when appropriate.
     required String model,
     required List<String> modalities,
   }) async {
-    debugPrint('🎨 [AI] Model: $model, Modalities: $modalities');
+    debugPrint(' [AI] Model: $model, Modalities: $modalities');
 
     try {
       final uri = Uri.parse(
@@ -342,7 +335,7 @@ You are allowed to be conversational and informal when appropriate.
       final response = await request.close();
       final responseBody = await response.transform(utf8.decoder).join();
 
-      debugPrint('🎨 [AI] HTTP Status: ${response.statusCode}');
+      debugPrint(' [AI] HTTP Status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(responseBody) as Map<String, dynamic>;
@@ -357,7 +350,7 @@ You are allowed to be conversational and informal when appropriate.
 
       return null;
     } catch (e) {
-      debugPrint('❌ [AI] Gemini error: $e');
+      debugPrint(' [AI] Gemini error: $e');
       return null;
     }
   }
@@ -367,7 +360,7 @@ You are allowed to be conversational and informal when appropriate.
     required String prompt,
     required String model,
   }) async {
-    debugPrint('🎨 [AI] Imagen Model: $model');
+    debugPrint(' [AI] Imagen Model: $model');
 
     try {
       final uri = Uri.parse(
@@ -389,7 +382,7 @@ You are allowed to be conversational and informal when appropriate.
       final response = await request.close();
       final responseBody = await response.transform(utf8.decoder).join();
 
-      debugPrint('🎨 [AI] HTTP Status: ${response.statusCode}');
+      debugPrint(' [AI] HTTP Status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(responseBody) as Map<String, dynamic>;
@@ -400,7 +393,7 @@ You are allowed to be conversational and informal when appropriate.
 
       return null;
     } catch (e) {
-      debugPrint('❌ [AI] Imagen error: $e');
+      debugPrint(' [AI] Imagen error: $e');
       return null;
     }
   }
@@ -408,56 +401,56 @@ You are allowed to be conversational and informal when appropriate.
   /// Debug log response structure
   void _debugLogResponse(Map<String, dynamic> data) {
     try {
-      debugPrint('🔍 [AI] Response keys: ${data.keys.toList()}');
+      debugPrint(' [AI] Response keys: ${data.keys.toList()}');
 
       final candidates = data['candidates'] as List<dynamic>?;
       if (candidates == null || candidates.isEmpty) {
-        debugPrint('🔍 [AI] No candidates found');
+        debugPrint(' [AI] No candidates found');
         return;
       }
 
-      debugPrint('🔍 [AI] Candidates count: ${candidates.length}');
+      debugPrint(' [AI] Candidates count: ${candidates.length}');
 
       final firstCandidate = candidates.first as Map<String, dynamic>;
       final content = firstCandidate['content'] as Map<String, dynamic>?;
 
       if (content == null) {
-        debugPrint('🔍 [AI] No content in first candidate');
+        debugPrint(' [AI] No content in first candidate');
         return;
       }
 
       final parts = content['parts'] as List<dynamic>?;
       if (parts == null || parts.isEmpty) {
-        debugPrint('🔍 [AI] No parts in content');
+        debugPrint(' [AI] No parts in content');
         return;
       }
 
-      debugPrint('🔍 [AI] Parts count: ${parts.length}');
+      debugPrint(' [AI] Parts count: ${parts.length}');
 
       for (int i = 0; i < parts.length; i++) {
         final part = parts[i] as Map<String, dynamic>;
-        debugPrint('🔍 [AI] Part $i keys: ${part.keys.toList()}');
+        debugPrint(' [AI] Part $i keys: ${part.keys.toList()}');
 
         if (part.containsKey('text')) {
           final text = part['text'] as String;
-          debugPrint('🔍 [AI] Part $i has text (${text.length} chars)');
+          debugPrint(' [AI] Part $i has text (${text.length} chars)');
         }
         if (part.containsKey('inline_data')) {
           final inlineData = part['inline_data'] as Map<String, dynamic>;
           debugPrint(
-            '🔍 [AI] Part $i has inline_data: ${inlineData.keys.toList()}',
+            ' [AI] Part $i has inline_data: ${inlineData.keys.toList()}',
           );
           if (inlineData.containsKey('mime_type')) {
-            debugPrint('🔍 [AI] MIME type: ${inlineData['mime_type']}');
+            debugPrint(' [AI] MIME type: ${inlineData['mime_type']}');
           }
           if (inlineData.containsKey('data')) {
             final dataStr = inlineData['data'] as String;
-            debugPrint('🔍 [AI] Data length: ${dataStr.length} chars');
+            debugPrint(' [AI] Data length: ${dataStr.length} chars');
           }
         }
       }
     } catch (e) {
-      debugPrint('🔍 [AI] Debug log error: $e');
+      debugPrint(' [AI] Debug log error: $e');
     }
   }
 
@@ -467,15 +460,15 @@ You are allowed to be conversational and informal when appropriate.
       final data = jsonDecode(responseBody) as Map<String, dynamic>;
       final error = data['error'] as Map<String, dynamic>?;
       if (error != null) {
-        debugPrint('❌ [AI] Error code: ${error['code']}');
-        debugPrint('❌ [AI] Error message: ${error['message']}');
-        debugPrint('❌ [AI] Error status: ${error['status']}');
+        debugPrint(' [AI] Error code: ${error['code']}');
+        debugPrint(' [AI] Error message: ${error['message']}');
+        debugPrint(' [AI] Error status: ${error['status']}');
       } else {
-        debugPrint('❌ [AI] Unknown error format');
+        debugPrint(' [AI] Unknown error format');
       }
     } catch (_) {
       debugPrint(
-        '❌ [AI] Raw error: ${responseBody.substring(0, responseBody.length > 200 ? 200 : responseBody.length)}',
+        ' [AI] Raw error: ${responseBody.substring(0, responseBody.length > 200 ? 200 : responseBody.length)}',
       );
     }
   }
@@ -485,19 +478,19 @@ You are allowed to be conversational and informal when appropriate.
     try {
       final candidates = data['candidates'] as List<dynamic>?;
       if (candidates == null || candidates.isEmpty) {
-        debugPrint('❌ [AI] No candidates in image response');
+        debugPrint(' [AI] No candidates in image response');
         return null;
       }
 
       final content = candidates.first['content'] as Map<String, dynamic>?;
       if (content == null) {
-        debugPrint('❌ [AI] No content in image response');
+        debugPrint(' [AI] No content in image response');
         return null;
       }
 
       final parts = content['parts'] as List<dynamic>?;
       if (parts == null || parts.isEmpty) {
-        debugPrint('❌ [AI] No parts in image response');
+        debugPrint(' [AI] No parts in image response');
         return null;
       }
 
@@ -510,7 +503,7 @@ You are allowed to be conversational and informal when appropriate.
             final base64Data = inlineData['data'] as String?;
 
             if (base64Data != null && mimeType?.startsWith('image/') == true) {
-              debugPrint('✅ [AI] Found image data, mime: $mimeType');
+              debugPrint(' [AI] Found image data, mime: $mimeType');
               return base64Decode(base64Data);
             }
           }
@@ -518,16 +511,16 @@ You are allowed to be conversational and informal when appropriate.
           // Also check for fileData
           final fileData = part['file_data'] as Map<String, dynamic>?;
           if (fileData != null) {
-            debugPrint('✅ [AI] Found file_data in response');
+            debugPrint(' [AI] Found file_data in response');
             // File data contains a URI, would need additional fetch
           }
         }
       }
 
-      debugPrint('❌ [AI] No image data found in response parts');
+      debugPrint(' [AI] No image data found in response parts');
       return null;
     } catch (e) {
-      debugPrint('❌ [AI] Error extracting image: $e');
+      debugPrint(' [AI] Error extracting image: $e');
       return null;
     }
   }
@@ -537,7 +530,7 @@ You are allowed to be conversational and informal when appropriate.
     try {
       final predictions = data['predictions'] as List<dynamic>?;
       if (predictions == null || predictions.isEmpty) {
-        debugPrint('❌ [AI] No predictions in Imagen response');
+        debugPrint(' [AI] No predictions in Imagen response');
         return null;
       }
 
@@ -545,14 +538,14 @@ You are allowed to be conversational and informal when appropriate.
       final bytesBase64 = prediction['bytesBase64Encoded'] as String?;
 
       if (bytesBase64 != null) {
-        debugPrint('✅ [AI] Found Imagen image data');
+        debugPrint(' [AI] Found Imagen image data');
         return base64Decode(bytesBase64);
       }
 
-      debugPrint('❌ [AI] No bytesBase64Encoded in Imagen response');
+      debugPrint(' [AI] No bytesBase64Encoded in Imagen response');
       return null;
     } catch (e) {
-      debugPrint('❌ [AI] Error extracting Imagen image: $e');
+      debugPrint(' [AI] Error extracting Imagen image: $e');
       return null;
     }
   }
@@ -568,7 +561,7 @@ You are allowed to be conversational and informal when appropriate.
     int retryCount = 0,
   }) async {
     if (_useFallback) {
-      debugPrint('⚠️ [AI] Using fallback mode for image analysis');
+      debugPrint(' [AI] Using fallback mode for image analysis');
       return _getMockFoodAnalysisResponse();
     }
 
@@ -599,7 +592,7 @@ You are allowed to be conversational and informal when appropriate.
     for (final apiVersion in apiVersions) {
       for (final visionModel in visionModels) {
         try {
-          debugPrint('🔄 [AI] Trying $visionModel with API $apiVersion...');
+          debugPrint(' [AI] Trying $visionModel with API $apiVersion...');
 
           final uri = Uri.parse(
             'https://generativelanguage.googleapis.com/$apiVersion/models/$visionModel:generateContent?key=$_apiKey',
@@ -636,7 +629,7 @@ You are allowed to be conversational and informal when appropriate.
           final responseBody = await response.transform(utf8.decoder).join();
 
           debugPrint(
-            '📥 [AI] $visionModel/$apiVersion status: ${response.statusCode}',
+            ' [AI] $visionModel/$apiVersion status: ${response.statusCode}',
           );
 
           if (response.statusCode == 200) {
@@ -650,7 +643,7 @@ You are allowed to be conversational and informal when appropriate.
               if (parts != null && parts.isNotEmpty) {
                 final responseText = parts.first['text'] as String;
                 debugPrint(
-                  '✅ [AI] Image analysis complete with $visionModel/$apiVersion',
+                  ' [AI] Image analysis complete with $visionModel/$apiVersion',
                 );
                 return responseText;
               }
@@ -660,24 +653,24 @@ You are allowed to be conversational and informal when appropriate.
           // Log error details for debugging
           if (response.statusCode != 200) {
             debugPrint(
-              '⚠️ [AI] $visionModel/$apiVersion failed: ${response.statusCode}',
+              ' [AI] $visionModel/$apiVersion failed: ${response.statusCode}',
             );
             // Try to get error message
             try {
               final errorData = jsonDecode(responseBody);
               debugPrint(
-                '⚠️ [AI] Error: ${errorData['error']?['message'] ?? responseBody}',
+                ' [AI] Error: ${errorData['error']?['message'] ?? responseBody}',
               );
             } catch (_) {}
           }
         } catch (e) {
-          debugPrint('❌ [AI] Exception with $visionModel/$apiVersion: $e');
+          debugPrint(' [AI] Exception with $visionModel/$apiVersion: $e');
         }
       }
     }
 
     // All models failed, return mock
-    debugPrint('❌ [AI] All vision models failed, using fallback');
+    debugPrint(' [AI] All vision models failed, using fallback');
     return _getMockFoodAnalysisResponse();
   }
 
